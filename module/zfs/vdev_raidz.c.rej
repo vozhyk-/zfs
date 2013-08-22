@@ -1,0 +1,36 @@
+diff a/module/zfs/vdev_raidz.c b/module/zfs/vdev_raidz.c	(rejected hunks)
+@@ -22,11 +22,15 @@
+ /*
+  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Copyright (c) 2013 by Delphix. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ #include <sys/zfs_context.h>
+ #include <sys/spa.h>
+ #include <sys/vdev_impl.h>
++#include <sys/vdev_disk.h>
++#include <sys/vdev_file.h>
++#include <sys/vdev_raidz.h>
+ #include <sys/zio.h>
+ #include <sys/zio_checksum.h>
+ #include <sys/fs/zfs.h>
+@@ -435,14 +441,14 @@ static const zio_vsd_ops_t vdev_raidz_vsd_ops = {
+  * the number of children in the target vdev.
+  */
+ static raidz_map_t *
+-vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
+-    uint64_t nparity)
++vdev_raidz_map_alloc(caddr_t data, uint64_t size, uint64_t offset,
++    uint64_t unit_shift, uint64_t dcols, uint64_t nparity)
+ {
+ 	raidz_map_t *rm;
+ 	/* The starting RAIDZ (parent) vdev sector of the block. */
+-	uint64_t b = zio->io_offset >> unit_shift;
++	uint64_t b = offset >> unit_shift;
+ 	/* The zio's size in units of the vdev's minimum sector size. */
+-	uint64_t s = zio->io_size >> unit_shift;
++	uint64_t s = size >> unit_shift;
+ 	/* The first column for this stripe. */
+ 	uint64_t f = b % dcols;
+ 	/* The starting byte offset on each child vdev. */
