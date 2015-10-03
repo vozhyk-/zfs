@@ -50,6 +50,22 @@ enum zio_compress {
 	ZIO_COMPRESS_GZIP_9,
 	ZIO_COMPRESS_ZLE,
 	ZIO_COMPRESS_LZ4,
+	ZIO_COMPRESS_LZ4HC_1,
+	ZIO_COMPRESS_LZ4HC_2,
+	ZIO_COMPRESS_LZ4HC_3,
+	ZIO_COMPRESS_LZ4HC_4,
+	ZIO_COMPRESS_LZ4HC_5,
+	ZIO_COMPRESS_LZ4HC_6,
+	ZIO_COMPRESS_LZ4HC_7,
+	ZIO_COMPRESS_LZ4HC_8,
+	ZIO_COMPRESS_LZ4HC_9,
+	ZIO_COMPRESS_LZ4HC_10,
+	ZIO_COMPRESS_LZ4HC_11,
+	ZIO_COMPRESS_LZ4HC_12,
+	ZIO_COMPRESS_LZ4HC_13,
+	ZIO_COMPRESS_LZ4HC_14,
+	ZIO_COMPRESS_LZ4HC_15,
+	ZIO_COMPRESS_LZ4HC_16,
 	ZIO_COMPRESS_FUNCTIONS
 };
 
@@ -104,10 +120,12 @@ extern zio_decompress_info_t zio_decompress_table[BP_COMPRESS_VALUES];
 #define	BP_COMPRESS_VALUE(C)	(zio_compress_table[C].ci_bp_compress_value)
 
 /*
- * lz4 compression init & free
+ * lz4 and lz4hc compression init & free
  */
 extern void lz4_init(void);
 extern void lz4_fini(void);
+extern void lz4hc_init(void);
+extern void lz4hc_fini(void);
 
 /*
  * Compression routines.
@@ -128,6 +146,8 @@ extern size_t lz4_compress_zfs(void *src, void *dst, size_t s_len, size_t d_len,
     int level);
 extern int lz4_decompress_zfs(void *src, void *dst, size_t s_len, size_t d_len,
     int level);
+extern size_t lz4hc_compress_zfs(void *src, void *dst, size_t s_len,
+    size_t d_len, int level);
 
 /*
  * Compress and decompress data if necessary.
