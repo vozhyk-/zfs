@@ -177,6 +177,8 @@ zio_init(void)
 	zio_inject_init();
 
 	lz4_init();
+
+	lz4hc_init();
 }
 
 void
@@ -214,6 +216,8 @@ zio_fini(void)
 	zio_inject_fini();
 
 	lz4_fini();
+
+	lz4hc_fini();
 }
 
 /*
