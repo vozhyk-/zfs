@@ -1019,3 +1019,31 @@ lz4hc_fini(void)
 		lz4hc_cache = NULL;
 	}
 }
+
+size_t
+lz4hc_compress_zfs(void *src, void *dst, size_t s_len, size_t d_len,
+    int level)
+{
+	uint32_t bufsiz;
+	char *dest = dst;
+
+	ASSERT(d_len >= sizeof (bufsiz));
+
+	bufsiz = LZ4_compress_HC(src, &dest[sizeof (bufsiz)], s_len,
+	    d_len - sizeof (bufsiz),
+	    level);
+
+	/* Signal an error if the compression routine returned zero. */
+	if (bufsiz == 0)
+		return (s_len);
+
+	/*
+	 * Encode the compresed buffer size at the start. We'll need this in
+	 * decompression to counter the effects of padding which might be
+	 * added to the compressed buffer and which, if unhandled, would
+	 * confuse the hell out of our decompression function.
+	 */
+	*(uint32_t *)dest = BE_32(bufsiz);
+
+	return (bufsiz + sizeof (bufsiz));
+}

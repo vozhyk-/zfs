@@ -53,10 +53,12 @@ typedef const struct zio_compress_info {
 extern zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS];
 
 /*
- * lz4 compression init & free
+ * lz4 and lz4hc compression init & free
  */
 extern void lz4_init(void);
 extern void lz4_fini(void);
+extern void lz4hc_init(void);
+extern void lz4hc_fini(void);
 
 /*
  * Compression routines.
@@ -77,6 +79,8 @@ extern size_t lz4_compress_zfs(void *src, void *dst, size_t s_len, size_t d_len,
     int level);
 extern int lz4_decompress_zfs(void *src, void *dst, size_t s_len, size_t d_len,
     int level);
+extern size_t lz4hc_compress_zfs(void *src, void *dst, size_t s_len,
+    size_t d_len, int level);
 
 /*
  * Compress and decompress data if necessary.
