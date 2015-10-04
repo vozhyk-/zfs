@@ -976,8 +976,9 @@ int LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
 			       int srcSize, int maxDstSize,
 			       int compressionLevel)
 {
-	if (((size_t) (state) & (sizeof(void *) - 1)) != 0)
-		return 0;	/* Error : state is not aligned for pointers (32 or 64 bits) */
+	/* alignment ensured by kmem_cache; so this is unnecessary */
+	//if (((size_t) (state) & (sizeof(void *) - 1)) != 0)
+	//	return 0;	/* Error : state is not aligned for pointers (32 or 64 bits) */
 	LZ4HC_init((LZ4HC_Data_Structure *) state, (const BYTE *)src);
 	if (maxDstSize < LZ4_compressBound(srcSize))
 		return LZ4HC_compress_generic(state, src, dst, srcSize,
@@ -995,7 +996,7 @@ int LZ4_compress_HC(const char *src, char *dst, int srcSize, int maxDstSize,
 	LZ4HC_Data_Structure *state = kmem_cache_alloc(lz4hc_cache, KM_SLEEP);
 
 	int result =
-		LZ4_compress_HC_extStateHC(&state, src, dst, srcSize, maxDstSize,
+		LZ4_compress_HC_extStateHC(state, src, dst, srcSize, maxDstSize,
 					   compressionLevel);
 
 	kmem_cache_free(lz4hc_cache, state);
@@ -1008,7 +1009,8 @@ lz4hc_init(void)
 {
 	lz4hc_cache = kmem_cache_create("lz4hc_cache",
 					sizeof(LZ4HC_Data_Structure),
-					0, NULL, NULL, NULL, NULL, NULL, 0);
+					sizeof (void *),
+					NULL, NULL, NULL, NULL, NULL, 0);
 }
 
 void
