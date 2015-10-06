@@ -98,7 +98,24 @@ zfs_prop_init(void)
 		{ "gzip-9",	ZIO_COMPRESS_GZIP_9 },
 		{ "zle",	ZIO_COMPRESS_ZLE },
 		{ "lz4",	ZIO_COMPRESS_LZ4 },
-		{ "lz4hc",	ZIO_COMPRESS_LZ4HC },
+		{ "lz4hc",	ZIO_COMPRESS_LZ4HC_9 },  /* lz4hc default */
+		{ "lz4hc-1",	ZIO_COMPRESS_LZ4HC_1 },
+		{ "lz4hc-1",	ZIO_COMPRESS_LZ4HC_1 },
+		{ "lz4hc-2",	ZIO_COMPRESS_LZ4HC_2 },
+		{ "lz4hc-3",	ZIO_COMPRESS_LZ4HC_3 },
+		{ "lz4hc-4",	ZIO_COMPRESS_LZ4HC_4 },
+		{ "lz4hc-5",	ZIO_COMPRESS_LZ4HC_5 },
+		{ "lz4hc-6",	ZIO_COMPRESS_LZ4HC_6 },
+		{ "lz4hc-7",	ZIO_COMPRESS_LZ4HC_7 },
+		{ "lz4hc-8",	ZIO_COMPRESS_LZ4HC_8 },
+		{ "lz4hc-9",	ZIO_COMPRESS_LZ4HC_9 },
+		{ "lz4hc-10",	ZIO_COMPRESS_LZ4HC_10 },
+		{ "lz4hc-11",	ZIO_COMPRESS_LZ4HC_11 },
+		{ "lz4hc-12",	ZIO_COMPRESS_LZ4HC_12 },
+		{ "lz4hc-13",	ZIO_COMPRESS_LZ4HC_13 },
+		{ "lz4hc-14",	ZIO_COMPRESS_LZ4HC_14 },
+		{ "lz4hc-15",	ZIO_COMPRESS_LZ4HC_15 },
+		{ "lz4hc-16",	ZIO_COMPRESS_LZ4HC_16 },
 		{ NULL }
 	};
 
@@ -239,7 +256,8 @@ zfs_prop_init(void)
 	zprop_register_index(ZFS_PROP_COMPRESSION, "compression",
 	    ZIO_COMPRESS_DEFAULT, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "on | off | lzjb | gzip | gzip-[1-9] | zle | lz4 | lz4hc",
+	    "on | off | lzjb | gzip | gzip-[1-9] | zle | lz4 | "
+	    "lz4hc | lz4hc-[1-16]",
 	    "COMPRESS", compress_table);
 	zprop_register_index(ZFS_PROP_SNAPDIR, "snapdir", ZFS_SNAPDIR_HIDDEN,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,

@@ -59,7 +59,22 @@ zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS] = {
 	{gzip_compress,		BP_COMPRESS_GZIP_9,	9,	"gzip-9"},
 	{zle_compress,		BP_COMPRESS_ZLE,	64,	"zle"},
 	{lz4_compress_zfs,	BP_COMPRESS_LZ4,	0,	"lz4"},
-	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	0,	"lz4hc"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	1,	"lz4hc-1"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	2,	"lz4hc-2"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	3,	"lz4hc-3"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	4,	"lz4hc-4"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	5,	"lz4hc-5"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	6,	"lz4hc-6"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	7,	"lz4hc-7"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	8,	"lz4hc-8"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	9,	"lz4hc-9"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	10,	"lz4hc-10"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	11,	"lz4hc-11"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	12,	"lz4hc-12"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	13,	"lz4hc-13"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	14,	"lz4hc-14"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	15,	"lz4hc-15"},
+	{lz4hc_compress_zfs,	BP_COMPRESS_LZ4,	16,	"lz4hc-16"},
 };
 
 zio_decompress_info_t zio_decompress_table[BP_COMPRESS_VALUES] = {
