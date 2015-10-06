@@ -32,7 +32,7 @@
        - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
-#include <sys/zfs_context.h>
+#include <sys/lz4_impl.h>
 
 /**************************************
 *  Tuning Parameter
@@ -97,23 +97,8 @@ static kmem_cache_t *lz4hc_cache;
 
 
 /**************************************
-*  Local Compiler Options
+*  BEGIN  Common LZ4 definition
 **************************************/
-/*
-#if defined(__GNUC__)
-#  pragma GCC diagnostic ignored "-Wunused-function"
-#endif
-
-#if defined (__clang__)
-#  pragma clang diagnostic ignored "-Wunused-function"
-#endif
-*/
-
-/**************************************
-*  Common LZ4 definition
-**************************************/
-
-/* FIXME eliminate copies of this */
 
 /**************************************
 *  Tuning parameters
@@ -133,20 +118,8 @@ static kmem_cache_t *lz4hc_cache;
 
 
 /**************************************
-*  CPU Feature Detection
-**************************************/
-/*
- * LZ4_FORCE_SW_BITCOUNT
- * Define this parameter if your target system or compiler does not support hardware bit count
- */
-
-
-/**************************************
 *  Compiler Options
 **************************************/
-/* LZ4_GCC_VERSION was taken from lz4.h */
-#define LZ4_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
 #  if defined(__GNUC__) || defined(__clang__)
 #    define FORCE_INLINE static inline __attribute__((always_inline))
@@ -157,46 +130,11 @@ static kmem_cache_t *lz4hc_cache;
 #  define FORCE_INLINE static
 #endif   /* __STDC_VERSION__ */
 
-#if (LZ4_GCC_VERSION >= 302) || (__INTEL_COMPILER >= 800) || defined(__clang__)
-#  define expect(expr,value)    (__builtin_expect ((expr),(value)) )
-#else
-#  define expect(expr,value)    (expr)
-#endif
-
-#ifndef likely
-#  define likely(expr)     expect((expr) != 0, 1)
-#endif
-#ifndef unlikely
-#  define unlikely(expr)   expect((expr) != 0, 0)
-#endif
-
 
 /**************************************
 *  Memory routines
 **************************************/
-#define ALLOCATOR(n,s) calloc(n,s)
-#define FREEMEM        free
 #define MEM_INIT       memset
-
-
-/**************************************
-*  Basic Types
-**************************************/
-// FIXME assume that *int*_t always exist instead?
-#if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
-# include <stdint.h>
-  typedef  uint8_t BYTE;
-  typedef uint16_t U16;
-  typedef uint32_t U32;
-  typedef  int32_t S32;
-  typedef uint64_t U64;
-#else
-  typedef unsigned char       BYTE;
-  typedef unsigned short      U16;
-  typedef unsigned int        U32;
-  typedef   signed int        S32;
-  typedef unsigned long long  U64;
-#endif
 
 
 /**************************************
@@ -218,19 +156,6 @@ static U16 LZ4_read16(const void* memPtr)
     U16 val16;
     memcpy(&val16, memPtr, 2);
     return val16;
-}
-
-static U16 LZ4_readLE16(const void* memPtr)
-{
-    if (LZ4_isLittleEndian())
-    {
-        return LZ4_read16(memPtr);
-    }
-    else
-    {
-        const BYTE* p = (const BYTE*)memPtr;
-        return (U16)((U16)p[0] + (p[1]<<8));
-    }
 }
 
 static void LZ4_writeLE16(void* memPtr, U16 value)
@@ -270,8 +195,6 @@ static size_t LZ4_read_ARCH(const void* p)
 }
 
 
-static void LZ4_copy4(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 4); }
-
 static void LZ4_copy8(void* dstPtr, const void* srcPtr) { memcpy(dstPtr, srcPtr, 8); }
 
 /* customized version of memcpy, which may overwrite up to 7 bytes beyond dstEnd */
@@ -287,24 +210,9 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 /**************************************
 *  Common Constants
 **************************************/
-#define MINMATCH 4
-
-#define COPYLENGTH 8
-#define LASTLITERALS 5
-#define MFLIMIT (COPYLENGTH+MINMATCH)
-static const int LZ4_minLength = (MFLIMIT+1);
-
 #define KB *(1 <<10)
 #define MB *(1 <<20)
 #define GB *(1U<<30)
-
-#define MAXD_LOG 16
-#define MAX_DISTANCE ((1 << MAXD_LOG) - 1)
-
-#define ML_BITS  4
-#define ML_MASK  ((1U<<ML_BITS)-1)
-#define RUN_BITS (8-ML_BITS)
-#define RUN_MASK ((1U<<RUN_BITS)-1)
 
 
 /**************************************

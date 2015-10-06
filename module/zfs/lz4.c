@@ -32,7 +32,7 @@
  * - LZ4 source repository : http://code.google.com/p/lz4/
  */
 
-#include <sys/zfs_context.h>
+#include <sys/lz4_impl.h>
 
 static int real_LZ4_compress(const char *source, char *dest, int isize,
     int osize);
@@ -245,39 +245,8 @@ lz4_decompress_zfs(void *s_start, void *d_start, size_t s_len,
 /* Disable restrict */
 #define	restrict
 
-/*
- * Linux : GCC_VERSION is defined as of 3.9-rc1, so undefine it.
- * torvalds/linux@3f3f8d2f48acfd8ed3b8e6b7377935da57b27b16
- */
-#ifdef GCC_VERSION
-#undef GCC_VERSION
-#endif
-
-#define	GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-
-#if (GCC_VERSION >= 302) || (__INTEL_COMPILER >= 800) || defined(__clang__)
-#define	expect(expr, value)    (__builtin_expect((expr), (value)))
-#else
-#define	expect(expr, value)    (expr)
-#endif
-
-#ifndef likely
-#define	likely(expr)	expect((expr) != 0, 1)
-#endif
-
-#ifndef unlikely
-#define	unlikely(expr)	expect((expr) != 0, 0)
-#endif
-
 #define	lz4_bswap16(x) ((unsigned short int) ((((x) >> 8) & 0xffu) | \
 	(((x) & 0xffu) << 8)))
-
-/* Basic types */
-#define	BYTE	uint8_t
-#define	U16	uint16_t
-#define	U32	uint32_t
-#define	S32	int32_t
-#define	U64	uint64_t
 
 #ifndef LZ4_FORCE_UNALIGNED_ACCESS
 #pragma pack(1)
@@ -304,8 +273,6 @@ typedef struct _U64_S {
 /*
  * Constants
  */
-#define	MINMATCH 4
-
 #define	HASH_LOG COMPRESSIONLEVEL
 #define	HASHTABLESIZE (1 << HASH_LOG)
 #define	HASH_MASK (HASHTABLESIZE - 1)
@@ -313,18 +280,7 @@ typedef struct _U64_S {
 #define	SKIPSTRENGTH (NOTCOMPRESSIBLE_CONFIRMATION > 2 ? \
 	NOTCOMPRESSIBLE_CONFIRMATION : 2)
 
-#define	COPYLENGTH 8
-#define	LASTLITERALS 5
-#define	MFLIMIT (COPYLENGTH + MINMATCH)
 #define	MINLENGTH (MFLIMIT + 1)
-
-#define	MAXD_LOG 16
-#define	MAX_DISTANCE ((1 << MAXD_LOG) - 1)
-
-#define	ML_BITS 4
-#define	ML_MASK ((1U<<ML_BITS)-1)
-#define	RUN_BITS (8-ML_BITS)
-#define	RUN_MASK ((1U<<RUN_BITS)-1)
 
 
 /*
@@ -383,7 +339,7 @@ static inline int
 LZ4_NbCommonBytes(register U64 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
-#if defined(__GNUC__) && (GCC_VERSION >= 304) && \
+#if defined(__GNUC__) && (LZ4_GCC_VERSION >= 304) && \
 	!defined(LZ4_FORCE_SW_BITCOUNT)
 	return (__builtin_clzll(val) >> 3);
 #else
@@ -404,7 +360,7 @@ LZ4_NbCommonBytes(register U64 val)
 	return (r);
 #endif
 #else
-#if defined(__GNUC__) && (GCC_VERSION >= 304) && \
+#if defined(__GNUC__) && (LZ4_GCC_VERSION >= 304) && \
 	!defined(LZ4_FORCE_SW_BITCOUNT)
 	return (__builtin_ctzll(val) >> 3);
 #else
@@ -426,7 +382,7 @@ static inline int
 LZ4_NbCommonBytes(register U32 val)
 {
 #if defined(LZ4_BIG_ENDIAN)
-#if defined(__GNUC__) && (GCC_VERSION >= 304) && \
+#if defined(__GNUC__) && (LZ4_GCC_VERSION >= 304) && \
 	!defined(LZ4_FORCE_SW_BITCOUNT)
 	return (__builtin_clz(val) >> 3);
 #else
@@ -442,7 +398,7 @@ LZ4_NbCommonBytes(register U32 val)
 	return (r);
 #endif
 #else
-#if defined(__GNUC__) && (GCC_VERSION >= 304) && \
+#if defined(__GNUC__) && (LZ4_GCC_VERSION >= 304) && \
 	!defined(LZ4_FORCE_SW_BITCOUNT)
 	return (__builtin_ctz(val) >> 3);
 #else
