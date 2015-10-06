@@ -101,23 +101,6 @@ static kmem_cache_t *lz4hc_cache;
 **************************************/
 
 /**************************************
-*  Tuning parameters
-**************************************/
-/*
- * HEAPMODE :
- * Select how default compression functions will allocate memory for their hash table,
- * in memory stack (0:default, fastest), or in memory heap (1:requires malloc()).
- */
-#define HEAPMODE 1
-
-/*
- * ACCELERATION_DEFAULT :
- * Select "acceleration" for LZ4_compress_fast() when parameter value <= 0
- */
-#define ACCELERATION_DEFAULT 1
-
-
-/**************************************
 *  Compiler Options
 **************************************/
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)   /* C99 */
@@ -213,12 +196,6 @@ static void LZ4_wildCopy(void* dstPtr, const void* srcPtr, void* dstEnd)
 #define KB *(1 <<10)
 #define MB *(1 <<20)
 #define GB *(1U<<30)
-
-
-/**************************************
-*  Common Utils
-**************************************/
-#define LZ4_STATIC_ASSERT(c)    { enum { LZ4_static_assert = 1/(int)(!!(c)) }; }   /* use only *after* variable declarations */
 
 
 /**************************************
@@ -575,6 +552,7 @@ FORCE_INLINE int LZ4HC_InsertAndGetWiderMatch(LZ4HC_Data_Structure * hc4,
 
 typedef enum { noLimit = 0, limitedOutput = 1 } limitedOutput_directive;
 
+// FIXME remove || do it the way everything else in ZFS does
 #define LZ4HC_DEBUG 0
 #if LZ4HC_DEBUG
 static unsigned debug = 0;
