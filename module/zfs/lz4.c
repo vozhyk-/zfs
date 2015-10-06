@@ -276,7 +276,6 @@ typedef struct _U64_S {
  * Architecture-specific macros
  */
 #if LZ4_ARCH64
-#define	STEPSIZE 8
 #define	UARCH U64
 #define	AARCH A64
 #define	LZ4_COPYSTEP(s, d)	A64(d) = A64(s); d += 8; s += 8;
@@ -285,7 +284,6 @@ typedef struct _U64_S {
 #define	HTYPE U32
 #define	INITBASE(base)		const BYTE* const base = ip
 #else /* !LZ4_ARCH64 */
-#define	STEPSIZE 4
 #define	UARCH U32
 #define	AARCH A32
 #define	LZ4_COPYSTEP(s, d)	A32(d) = A32(s); d += 4; s += 4;
@@ -320,90 +318,6 @@ struct refTables {
 #define	LZ4_BLINDCOPY(s, d, l) { BYTE* e = (d) + l; LZ4_WILDCOPY(s, d, e); \
 	d = e; }
 
-
-/* Private functions */
-#if LZ4_ARCH64
-
-static inline int
-LZ4_NbCommonBytes(register U64 val)
-{
-#if defined(LZ4_BIG_ENDIAN)
-#if defined(__GNUC__) && (LZ4_GCC_VERSION >= 304) && \
-	!defined(LZ4_FORCE_SW_BITCOUNT)
-	return (__builtin_clzll(val) >> 3);
-#else
-	int r;
-	if (!(val >> 32)) {
-		r = 4;
-	} else {
-		r = 0;
-		val >>= 32;
-	}
-	if (!(val >> 16)) {
-		r += 2;
-		val >>= 8;
-	} else {
-		val >>= 24;
-	}
-	r += (!val);
-	return (r);
-#endif
-#else
-#if defined(__GNUC__) && (LZ4_GCC_VERSION >= 304) && \
-	!defined(LZ4_FORCE_SW_BITCOUNT)
-	return (__builtin_ctzll(val) >> 3);
-#else
-	static const int DeBruijnBytePos[64] =
-	    { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0, 2, 3, 6, 1, 5,
-		3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5,
-		5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4,
-		4, 5, 7, 2, 6, 5, 7, 6, 7, 7
-	};
-	return DeBruijnBytePos[((U64) ((val & -val) * 0x0218A392CDABBD3F)) >>
-	    58];
-#endif
-#endif
-}
-
-#else
-
-static inline int
-LZ4_NbCommonBytes(register U32 val)
-{
-#if defined(LZ4_BIG_ENDIAN)
-#if defined(__GNUC__) && (LZ4_GCC_VERSION >= 304) && \
-	!defined(LZ4_FORCE_SW_BITCOUNT)
-	return (__builtin_clz(val) >> 3);
-#else
-	int r;
-	if (!(val >> 16)) {
-		r = 2;
-		val >>= 8;
-	} else {
-		r = 0;
-		val >>= 24;
-	}
-	r += (!val);
-	return (r);
-#endif
-#else
-#if defined(__GNUC__) && (LZ4_GCC_VERSION >= 304) && \
-	!defined(LZ4_FORCE_SW_BITCOUNT)
-	return (__builtin_ctz(val) >> 3);
-#else
-	static const int DeBruijnBytePos[32] = {
-		0, 0, 3, 0, 3, 1, 3, 0,
-		3, 2, 2, 1, 3, 2, 0, 1,
-		3, 3, 1, 2, 2, 2, 2, 0,
-		3, 1, 2, 0, 1, 0, 1, 1
-	};
-	return DeBruijnBytePos[((U32) ((val & -(S32) val) * 0x077CB531U)) >>
-	    27];
-#endif
-#endif
-}
-
-#endif
 
 /* Compression functions */
 

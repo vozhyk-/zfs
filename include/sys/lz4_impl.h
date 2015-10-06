@@ -33,7 +33,14 @@
        - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
 */
 
+#ifndef _SYS_LZ4_IMPL_H
+#define	_SYS_LZ4_IMPL_H
+
 #include <sys/zfs_context.h>
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 /**************************************
 *  CPU Feature Detection
@@ -99,3 +106,103 @@ typedef uint64_t U64;
 #define ML_MASK  ((1U<<ML_BITS)-1)
 #define RUN_BITS (8-ML_BITS)
 #define RUN_MASK ((1U<<RUN_BITS)-1)
+
+
+/**************************************
+*  Reading and writing into memory
+**************************************/
+#define STEPSIZE sizeof(size_t)
+
+static unsigned LZ4_64bits(void) { return sizeof(void*)==8; }
+
+static unsigned LZ4_isLittleEndian(void)
+{
+	/* don't use static : performance detrimental */
+	const union { U32 i; BYTE c[4]; } one = { 1 };
+	return one.c[0];
+}
+
+
+/* Common functions */
+
+static unsigned LZ4_NbCommonBytes(register size_t val)
+{
+	if (LZ4_isLittleEndian()) {
+		if (LZ4_64bits()) {
+#if (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && \
+	!defined(LZ4_FORCE_SW_BITCOUNT)
+			return (__builtin_ctzll((U64) val) >> 3);
+#else
+			static const int DeBruijnBytePos[64] =
+			    { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7, 0,
+ 2, 3, 6, 1, 5, 3, 5, 1, 3, 4, 4, 2, 5, 6, 7, 7, 0, 1, 2, 3, 3, 4, 6, 2, 6, 5,
+ 5, 3, 4, 5, 6, 7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7 };
+			return
+			    DeBruijnBytePos[((U64)
+					     ((val & -(long long)val) *
+					      0x0218A392CDABBD3FULL)) >> 58];
+#endif
+		} else {	/* 32 bits */
+
+#if (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && \
+	!defined(LZ4_FORCE_SW_BITCOUNT)
+			return (__builtin_ctz((U32) val) >> 3);
+#else
+			static const int DeBruijnBytePos[32] =
+			    { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1, 3,
+ 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1 };
+			return
+			    DeBruijnBytePos[((U32)
+					     ((val & -(S32) val) *
+					      0x077CB531U)) >> 27];
+#endif
+		}
+	} else {		/* Big Endian CPU */
+
+		if (LZ4_64bits()) {
+#if (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && \
+	!defined(LZ4_FORCE_SW_BITCOUNT)
+			return (__builtin_clzll((U64) val) >> 3);
+#else
+			unsigned r;
+			if (!(val >> 32)) {
+				r = 4;
+			} else {
+				r = 0;
+				val >>= 32;
+			}
+			if (!(val >> 16)) {
+				r += 2;
+				val >>= 8;
+			} else {
+				val >>= 24;
+			}
+			r += (!val);
+			return r;
+#endif
+		} else {	/* 32 bits */
+
+#if (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && \
+	!defined(LZ4_FORCE_SW_BITCOUNT)
+			return (__builtin_clz((U32) val) >> 3);
+#else
+			unsigned r;
+			if (!(val >> 16)) {
+				r = 2;
+				val >>= 8;
+			} else {
+				r = 0;
+				val >>= 24;
+			}
+			r += (!val);
+			return r;
+#endif
+		}
+	}
+}
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _SYS_LZ4_IMPL_H */
