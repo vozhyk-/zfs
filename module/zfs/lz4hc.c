@@ -42,8 +42,9 @@ static const int LZ4HC_compressionLevel_default = 9;
 /**************************************
 *  Definitions from header
 **************************************/
-int LZ4_compress_HC(const char *src, char *dst, int srcSize, int maxDstSize,
-		    int compressionLevel);
+static int LZ4_compress_HC(const char *src, char *dst,
+                           int srcSize, int maxDstSize,
+                           int compressionLevel);
 /*
 LZ4_compress_HC :
     Destination buffer 'dst' must be already allocated.
@@ -61,9 +62,9 @@ LZ4_compress_HC :
    Decompression functions are provided within LZ4 source code (see "lz4.h") (BSD license)
  */
 
-int LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
-			       int srcSize, int maxDstSize,
-			       int compressionLevel);
+static int LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
+                                      int srcSize, int maxDstSize,
+                                      int compressionLevel);
 /*
 LZ4_compress_HC_extStateHC() :
    Use this function if you prefer to manually allocate memory for compression tables.
@@ -90,7 +91,7 @@ LZ4_compressBound() :
         return : maximum output size in a "worst case" scenario
               or 0, if input size is too large ( > LZ4_MAX_INPUT_SIZE)
 */
-int LZ4_compressBound(int inputSize);
+static int LZ4_compressBound(int inputSize);
 
 
 static kmem_cache_t *lz4hc_cache;
@@ -304,7 +305,7 @@ static unsigned LZ4_count(const BYTE * pIn, const BYTE * pMatch,
 	return (unsigned)(pIn - pStart);
 }
 
-int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
+static int LZ4_compressBound(int isize)  { return LZ4_COMPRESSBOUND(isize); }
 
 
 /**************************************
@@ -656,6 +657,7 @@ static int LZ4HC_compress_generic(void *ctxvoid,
 	const BYTE *ref0;
 
 	/* init */
+	// FIXME remove checking || replace with assert
 	if (compressionLevel > g_maxCompressionLevel)
 		compressionLevel = g_maxCompressionLevel;
 	if (compressionLevel < 1)
@@ -853,16 +855,17 @@ _Search3:
 	return (int)(((char *)op) - dest);
 }
 
-int LZ4_sizeofStateHC(void)
+static int LZ4_sizeofStateHC(void)
 {
 	return sizeof(LZ4HC_Data_Structure);
 }
 
-int LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
-			       int srcSize, int maxDstSize,
-			       int compressionLevel)
+static int LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
+                                      int srcSize, int maxDstSize,
+                                      int compressionLevel)
 {
 	/* alignment ensured by kmem_cache; so this is unnecessary */
+	// FIXME replace with assert?
 	//if (((size_t) (state) & (sizeof(void *) - 1)) != 0)
 	//	return 0;	/* Error : state is not aligned for pointers (32 or 64 bits) */
 	LZ4HC_init((LZ4HC_Data_Structure *) state, (const BYTE *)src);
@@ -876,8 +879,9 @@ int LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
 					      noLimit);
 }
 
-int LZ4_compress_HC(const char *src, char *dst, int srcSize, int maxDstSize,
-		    int compressionLevel)
+static int LZ4_compress_HC(const char *src, char *dst,
+			   int srcSize, int maxDstSize,
+			   int compressionLevel)
 {
 	LZ4HC_Data_Structure *state = kmem_cache_alloc(lz4hc_cache, KM_SLEEP);
 
@@ -894,7 +898,7 @@ void
 lz4hc_init(void)
 {
 	lz4hc_cache = kmem_cache_create("lz4hc_cache",
-					sizeof(LZ4HC_Data_Structure),
+					LZ4_sizeofStateHC(),
 					sizeof (void *),
 					NULL, NULL, NULL, NULL, NULL, 0);
 }
