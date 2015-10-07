@@ -797,6 +797,10 @@ LZ4_compress_HC(const char *src, char *dst,
 {
 	LZ4HC_Data_Structure *state = kmem_cache_alloc(lz4hc_cache, KM_SLEEP);
 
+	/* out of kernel memory, fail */
+	if (state == NULL)
+		return (0);
+
 	int result = LZ4_compress_HC_extStateHC(state, src, dst,
 	    srcSize, maxDstSize, compressionLevel);
 
