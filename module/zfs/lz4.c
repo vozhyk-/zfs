@@ -205,7 +205,6 @@ lz4_decompress_zfs(void *s_start, void *d_start, size_t s_len,
 
 /*
  * Little Endian or Big Endian?
- * Note: overwrite the below #define if you know your architecture endianess.
  */
 #if defined(_BIG_ENDIAN)
 #define	LZ4_BIG_ENDIAN 1
