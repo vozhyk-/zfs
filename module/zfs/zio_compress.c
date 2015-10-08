@@ -31,6 +31,10 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2015 by Witaut Bajaryn. All rights reserved.
+ */
+
 #include <sys/zfs_context.h>
 #include <sys/compress.h>
 #include <sys/spa.h>
