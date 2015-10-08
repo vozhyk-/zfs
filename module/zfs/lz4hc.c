@@ -140,7 +140,7 @@ LZ4_writeLE16(void *memPtr, U16 value)
 	if (LZ4_isLittleEndian()) {
 		(void) memcpy(memPtr, &value, 2);
 	} else {
-		BYTE *p = (BYTE *) memPtr;
+		BYTE *p = (BYTE *)memPtr;
 		p[0] = (BYTE)value;
 		p[1] = (BYTE)(value >> 8);
 	}
@@ -184,9 +184,9 @@ LZ4_copy8(void *dstPtr, const void *srcPtr)
 static void
 LZ4_wildCopy(void *dstPtr, const void *srcPtr, void *dstEnd)
 {
-	BYTE *d = (BYTE *) dstPtr;
+	BYTE *d = (BYTE *)dstPtr;
 	const BYTE *s = (const BYTE *)srcPtr;
-	BYTE *e = (BYTE *) dstEnd;
+	BYTE *e = (BYTE *)dstEnd;
 	do {
 		LZ4_copy8(d, s);
 		d += 8;
@@ -553,7 +553,7 @@ LZ4HC_compress_generic(
 	const BYTE *const mflimit = iend - MFLIMIT;
 	const BYTE *const matchlimit = (iend - LASTLITERALS);
 
-	BYTE *op = (BYTE *) dest;
+	BYTE *op = (BYTE *)dest;
 	BYTE *const oend = op + maxOutputSize;
 
 	unsigned maxNbAttempts;
