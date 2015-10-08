@@ -78,7 +78,7 @@ static int LZ4_compress_HC(const char *src, char *dst, int srcSize,
 static int LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
     int srcSize, int maxDstSize, int compressionLevel);
 
-#define	LZ4_MAX_INPUT_SIZE	0x7E000000 /* 2 113 929 216 bytes */
+#define	LZ4_MAX_INPUT_SIZE	0x7E000000	/* 2 113 929 216 bytes */
 #define	LZ4_COMPRESSBOUND(isize) \
 	((unsigned)(isize) > (unsigned)LZ4_MAX_INPUT_SIZE ? \
 	0 : (isize) + ((isize)/255) + 16)
@@ -452,7 +452,6 @@ LZ4HC_InsertAndGetWiderMatch(LZ4HC_Data_Structure * hc4,
 
 typedef enum { noLimit = 0, limitedOutput = 1 } limitedOutput_directive;
 
-// FIXME remove || do it the way everything else in ZFS does
 #define	LZ4HC_DEBUG 0
 #if LZ4HC_DEBUG
 static unsigned debug = 0;
@@ -560,11 +559,8 @@ LZ4HC_compress_generic(
 	const BYTE *ref0;
 
 	/* init */
-	// FIXME remove checking || replace with assert
-	if (compressionLevel > g_maxCompressionLevel)
-		compressionLevel = g_maxCompressionLevel;
-	if (compressionLevel < 1)
-		compressionLevel = LZ4HC_compressionLevel_default;
+	ASSERT((compressionLevel >= 1) &&
+	    (compressionLevel <= g_maxCompressionLevel));
 	maxNbAttempts = 1 << (compressionLevel - 1);
 	ctx->end += inputSize;
 
@@ -775,10 +771,9 @@ static int
 LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
     int srcSize, int maxDstSize, int compressionLevel)
 {
-	// FIXME replace with assert?
-	// if (((size_t) (state) & (sizeof (void *) - 1)) != 0)
-	//	return (0);	/* Error : state is not aligned for pointers */
-	//			/*   (32 or 64 bits) */
+	/* state should be aligned for pointers (32 or 64 bits) */
+	ASSERT(((size_t) (state) & (sizeof (void *) - 1)) == 0);
+
 	LZ4HC_init((LZ4HC_Data_Structure *) state, (const BYTE *)src);
 	if (maxDstSize < LZ4_compressBound(srcSize))
 		return (LZ4HC_compress_generic(state, src, dst, srcSize,
