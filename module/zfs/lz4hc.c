@@ -329,9 +329,9 @@ LZ4HC_InsertAndFindBestMatch(
 			match = base + matchIndex;
 			if (*(match + ml) == *(ip + ml) &&
 			    (LZ4_read32(match) == LZ4_read32(ip))) {
-				size_t mlt =
-				    LZ4_count(ip + MINMATCH, match + MINMATCH,
-					iLimit) + MINMATCH;
+				size_t mlt = LZ4_count(
+				    ip + MINMATCH, match + MINMATCH, iLimit) +
+				    MINMATCH;
 				if (mlt > ml) {
 					ml = mlt;
 					*matchpos = match;
@@ -345,12 +345,12 @@ LZ4HC_InsertAndFindBestMatch(
 				    ip + (dictLimit - matchIndex);
 				if (vLimit > iLimit)
 					vLimit = iLimit;
-				mlt =
-				    LZ4_count(ip + MINMATCH, match + MINMATCH,
-					vLimit) + MINMATCH;
+				mlt = LZ4_count(
+				    ip + MINMATCH, match + MINMATCH, vLimit) +
+				    MINMATCH;
 				if ((ip + mlt == vLimit) && (vLimit < iLimit))
-					mlt += LZ4_count(ip + mlt,
-					    base + dictLimit, iLimit);
+					mlt += LZ4_count(
+					    ip + mlt, base + dictLimit, iLimit);
 				if (mlt > ml) {
 					ml = mlt;
 					*matchpos = base + matchIndex;
@@ -426,8 +426,7 @@ LZ4HC_InsertAndGetWiderMatch(LZ4HC_Data_Structure * hc4,
 				if (vLimit > iHighLimit)
 					vLimit = iHighLimit;
 				mlt = LZ4_count(ip + MINMATCH,
-				    matchPtr + MINMATCH,
-				    vLimit) + MINMATCH;
+				    matchPtr + MINMATCH, vLimit) + MINMATCH;
 				if ((ip + mlt == vLimit) &&
 				    (vLimit < iHighLimit))
 					mlt += LZ4_count(ip + mlt,
@@ -573,8 +572,8 @@ LZ4HC_compress_generic(
 
 	/* Main Loop */
 	while (ip < mflimit) {
-		ml = LZ4HC_InsertAndFindBestMatch(ctx, ip, matchlimit, (&ref),
-		    maxNbAttempts);
+		ml = LZ4HC_InsertAndFindBestMatch(
+		    ctx, ip, matchlimit, (&ref), maxNbAttempts);
 		if (!ml) {
 			ip++;
 			continue;
@@ -594,8 +593,8 @@ _Search2:
 			ml2 = ml;
 
 		if (ml2 == ml) {	/* No better match */
-			if (LZ4HC_encodeSequence
-			    (&ip, &op, &anchor, ml, ref, limit, oend))
+			if (LZ4HC_encodeSequence(
+			    &ip, &op, &anchor, ml, ref, limit, oend))
 				return (0);
 			continue;
 		}
@@ -653,12 +652,12 @@ _Search3:
 			if (start2 < ip + ml)
 				ml = (int)(start2 - ip);
 			/* Now, encode 2 sequences */
-			if (LZ4HC_encodeSequence
-			    (&ip, &op, &anchor, ml, ref, limit, oend))
+			if (LZ4HC_encodeSequence(
+			    &ip, &op, &anchor, ml, ref, limit, oend))
 				return (0);
 			ip = start2;
-			if (LZ4HC_encodeSequence
-			    (&ip, &op, &anchor, ml2, ref2, limit, oend))
+			if (LZ4HC_encodeSequence(
+			    &ip, &op, &anchor, ml2, ref2, limit, oend))
 				return (0);
 			continue;
 		}
@@ -683,8 +682,8 @@ _Search3:
 					}
 				}
 
-				if (LZ4HC_encodeSequence
-				    (&ip, &op, &anchor, ml, ref, limit, oend))
+				if (LZ4HC_encodeSequence(
+				    &ip, &op, &anchor, ml, ref, limit, oend))
 					return (0);
 				ip = start3;
 				ref = ref3;
@@ -726,8 +725,8 @@ _Search3:
 				ml = (int)(start2 - ip);
 			}
 		}
-		if (LZ4HC_encodeSequence
-		    (&ip, &op, &anchor, ml, ref, limit, oend))
+		if (LZ4HC_encodeSequence(
+		    &ip, &op, &anchor, ml, ref, limit, oend))
 			return (0);
 
 		ip = start2;
