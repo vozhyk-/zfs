@@ -33,9 +33,6 @@
 
 #include <sys/lz4_impl.h>
 
-/* Tuning Parameter */
-static const int LZ4HC_compressionLevel_default = 9;
-
 /* Header */
 
 /*
