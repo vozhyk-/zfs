@@ -27,8 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * You can contact the author at :
- *     - LZ4 source repository : https://github.com/Cyan4973/lz4
- *     - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
+ * - LZ4 source repository : https://github.com/Cyan4973/lz4
+ * - LZ4 public forum : https://groups.google.com/forum/#!forum/lz4c
  */
 
 #include <sys/lz4_impl.h>
@@ -51,8 +51,9 @@ static const int LZ4HC_compressionLevel_default = 9;
  *	    return : the number of bytes written into buffer 'dst'
  *		    or 0 if compression fails.
  */
-static int LZ4_compress_HC(const char *src, char *dst, int srcSize,
-    int maxDstSize, int compressionLevel);
+static int
+LZ4_compress_HC(const char *src, char *dst, int srcSize, int maxDstSize,
+    int compressionLevel);
 
 /*
  * Note :
@@ -75,7 +76,8 @@ static int LZ4_compress_HC(const char *src, char *dst, int srcSize,
  *	described function.  It just uses externally allocated memory
  *	for stateHC.
  */
-static int LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
+static int
+LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
     int srcSize, int maxDstSize, int compressionLevel);
 
 #define	LZ4_MAX_INPUT_SIZE	0x7E000000	/* 2 113 929 216 bytes */
@@ -97,7 +99,9 @@ static int LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
  *		return : maximum output size in a "worst case" scenario
  *			or 0, if input size is too large ( > LZ4_MAX_INPUT_SIZE)
  */
-static int LZ4_compressBound(int inputSize);
+static int
+LZ4_compressBound(int inputSize);
+
 
 static kmem_cache_t *lz4hc_cache;
 
@@ -117,14 +121,16 @@ static kmem_cache_t *lz4hc_cache;
 /* Memory routines */
 #define	MEM_INIT	memset
 
-static U16 LZ4_read16(const void *memPtr)
+static U16
+LZ4_read16(const void *memPtr)
 {
 	U16 val16;
 	memcpy(&val16, memPtr, 2);
 	return (val16);
 }
 
-static void LZ4_writeLE16(void *memPtr, U16 value)
+static void
+LZ4_writeLE16(void *memPtr, U16 value)
 {
 	if (LZ4_isLittleEndian()) {
 		memcpy(memPtr, &value, 2);
@@ -135,21 +141,24 @@ static void LZ4_writeLE16(void *memPtr, U16 value)
 	}
 }
 
-static U32 LZ4_read32(const void *memPtr)
+static U32
+LZ4_read32(const void *memPtr)
 {
 	U32 val32;
 	memcpy(&val32, memPtr, 4);
 	return (val32);
 }
 
-static U64 LZ4_read64(const void *memPtr)
+static U64
+LZ4_read64(const void *memPtr)
 {
 	U64 val64;
 	memcpy(&val64, memPtr, 8);
 	return (val64);
 }
 
-static size_t LZ4_read_ARCH(const void *p)
+static size_t
+LZ4_read_ARCH(const void *p)
 {
 	if (LZ4_64bits())
 		return ((size_t) LZ4_read64(p));
@@ -157,7 +166,8 @@ static size_t LZ4_read_ARCH(const void *p)
 		return ((size_t) LZ4_read32(p));
 }
 
-static void LZ4_copy8(void *dstPtr, const void *srcPtr)
+static void
+LZ4_copy8(void *dstPtr, const void *srcPtr)
 {
 	memcpy(dstPtr, srcPtr, 8);
 }
@@ -166,7 +176,8 @@ static void LZ4_copy8(void *dstPtr, const void *srcPtr)
  * customized version of memcpy,
  * which may overwrite up to 7 bytes beyond dstEnd
  */
-static void LZ4_wildCopy(void *dstPtr, const void *srcPtr, void *dstEnd)
+static void
+LZ4_wildCopy(void *dstPtr, const void *srcPtr, void *dstEnd)
 {
 	BYTE *d = (BYTE *) dstPtr;
 	const BYTE *s = (const BYTE *)srcPtr;
@@ -184,7 +195,8 @@ static void LZ4_wildCopy(void *dstPtr, const void *srcPtr, void *dstEnd)
 #define	GB *(1U<<30)
 
 /* Common functions */
-static unsigned LZ4_count(const BYTE * pIn, const BYTE * pMatch,
+static unsigned
+LZ4_count(const BYTE * pIn, const BYTE * pMatch,
     const BYTE * pInLimit)
 {
 	const BYTE *const pStart = pIn;
@@ -215,7 +227,8 @@ static unsigned LZ4_count(const BYTE * pIn, const BYTE * pMatch,
 	return ((unsigned)(pIn - pStart));
 }
 
-static int LZ4_compressBound(int isize)
+static int
+LZ4_compressBound(int isize)
 {
 	return (LZ4_COMPRESSBOUND(isize));
 }
@@ -258,13 +271,15 @@ typedef struct {
 /* #define	DELTANEXTU16(p)	chainTable[(p) & MAXD_MASK] */
 #define	DELTANEXTU16(p)	chainTable[(U16)(p)]	/* faster */
 
-static U32 LZ4HC_hashPtr(const void *ptr)
+static U32
+LZ4HC_hashPtr(const void *ptr)
 {
 	return (HASH_FUNCTION(LZ4_read32(ptr)));
 }
 
 /* HC Compression */
-static void LZ4HC_init(LZ4HC_Data_Structure * hc4, const BYTE * start)
+static void
+LZ4HC_init(LZ4HC_Data_Structure * hc4, const BYTE * start)
 {
 	MEM_INIT((void *)hc4->hashTable, 0, sizeof (hc4->hashTable));
 	MEM_INIT(hc4->chainTable, 0xFF, sizeof (hc4->chainTable));
