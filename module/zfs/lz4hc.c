@@ -467,11 +467,6 @@ LZ4HC_InsertAndGetWiderMatch(LZ4HC_Data_Structure * hc4,
 
 typedef enum { noLimit = 0, limitedOutput = 1 } limitedOutput_directive;
 
-#define	LZ4HC_DEBUG 0
-#if LZ4HC_DEBUG
-static unsigned debug = 0;
-#endif
-
 FORCE_INLINE int
 LZ4HC_encodeSequence(
 	const BYTE ** ip,
@@ -484,13 +479,6 @@ LZ4HC_encodeSequence(
 {
 	int length;
 	BYTE *token;
-
-#if LZ4HC_DEBUG
-	if (debug)
-		(void) printf("literal : %u  --  match : %u  --  offset : %u\n",
-		    (U32)(*ip - *anchor), (U32)matchLength,
-		    (U32)(*ip - match));
-#endif
 
 	/* Encode Literal length */
 	length = (int)(*ip - *anchor);
