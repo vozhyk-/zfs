@@ -36,6 +36,11 @@
 /* Header */
 
 /*
+ * ZFS changes:
+ *	- LZ4HC_DEBUG removed
+ */
+
+/*
  * LZ4_compress_HC :
  *	Destination buffer 'dst' must be already allocated.
  *	Compression completion is guaranteed if 'dst' buffer is sized
@@ -44,9 +49,10 @@
  *	    srcSize : Max supported value is LZ4_MAX_INPUT_SIZE
  *	    compressionLevel : Recommended values are between 4 and 9,
  *				although any value between 1 and 16 will work.
- *				Values >16 behave the same as 16.
  *	    return : the number of bytes written into buffer 'dst'
  *		    or 0 if compression fails.
+ *	ZFS changes : compression level checking replaced with an assertion;
+ *			default value is set in module/zcommon/zfs_prop.c
  */
 static int
 LZ4_compress_HC(const char *src, char *dst, int srcSize, int maxDstSize,
@@ -65,13 +71,15 @@ LZ4_compress_HC(const char *src, char *dst, int srcSize, int maxDstSize,
  *		int LZ4_sizeofStateHC();
  *
  *	Allocated memory must be aligned on 8-bytes boundaries
- *	(which a normal malloc() will do properly).
+ *	(which kmem_cache_alloc() will do properly).
  *
  *	The allocated memory can then be provided to the compression functions
  *	using 'void* state' parameter.
  *	LZ4_compress_HC_extStateHC() is equivalent to previously
  *	described function.  It just uses externally allocated memory
  *	for stateHC.
+ *
+ *	ZFS Changes : state alignment checking replaced with an assertion
  */
 static int
 LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
