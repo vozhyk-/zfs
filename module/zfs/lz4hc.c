@@ -125,7 +125,7 @@ static U16
 LZ4_read16(const void *memPtr)
 {
 	U16 val16;
-	memcpy(&val16, memPtr, 2);
+	(void) memcpy(&val16, memPtr, 2);
 	return (val16);
 }
 
@@ -133,11 +133,11 @@ static void
 LZ4_writeLE16(void *memPtr, U16 value)
 {
 	if (LZ4_isLittleEndian()) {
-		memcpy(memPtr, &value, 2);
+		(void) memcpy(memPtr, &value, 2);
 	} else {
 		BYTE *p = (BYTE *) memPtr;
-		p[0] = (BYTE) value;
-		p[1] = (BYTE) (value >> 8);
+		p[0] = (BYTE)value;
+		p[1] = (BYTE)(value >> 8);
 	}
 }
 
@@ -145,7 +145,7 @@ static U32
 LZ4_read32(const void *memPtr)
 {
 	U32 val32;
-	memcpy(&val32, memPtr, 4);
+	(void) memcpy(&val32, memPtr, 4);
 	return (val32);
 }
 
@@ -153,7 +153,7 @@ static U64
 LZ4_read64(const void *memPtr)
 {
 	U64 val64;
-	memcpy(&val64, memPtr, 8);
+	(void) memcpy(&val64, memPtr, 8);
 	return (val64);
 }
 
@@ -161,15 +161,15 @@ static size_t
 LZ4_read_ARCH(const void *p)
 {
 	if (LZ4_64bits())
-		return ((size_t) LZ4_read64(p));
+		return ((size_t)LZ4_read64(p));
 	else
-		return ((size_t) LZ4_read32(p));
+		return ((size_t)LZ4_read32(p));
 }
 
 static void
 LZ4_copy8(void *dstPtr, const void *srcPtr)
 {
-	memcpy(dstPtr, srcPtr, 8);
+	(void) memcpy(dstPtr, srcPtr, 8);
 }
 
 /*
@@ -281,8 +281,8 @@ LZ4HC_hashPtr(const void *ptr)
 static void
 LZ4HC_init(LZ4HC_Data_Structure * hc4, const BYTE * start)
 {
-	MEM_INIT((void *)hc4->hashTable, 0, sizeof (hc4->hashTable));
-	MEM_INIT(hc4->chainTable, 0xFF, sizeof (hc4->chainTable));
+	(void) MEM_INIT((void *)hc4->hashTable, 0, sizeof (hc4->hashTable));
+	(void) MEM_INIT(hc4->chainTable, 0xFF, sizeof (hc4->chainTable));
 	hc4->nextToUpdate = 64 KB;
 	hc4->base = start - 64 KB;
 	hc4->end = start;
@@ -487,9 +487,9 @@ LZ4HC_encodeSequence(
 
 #if LZ4HC_DEBUG
 	if (debug)
-		printf("literal : %u  --  match : %u  --  offset : %u\n",
-		    (U32) (*ip - *anchor), (U32) matchLength,
-		    (U32) (*ip - match));
+		(void) printf("literal : %u  --  match : %u  --  offset : %u\n",
+		    (U32)(*ip - *anchor), (U32)matchLength,
+		    (U32)(*ip - match));
 #endif
 
 	/* Encode Literal length */
@@ -504,16 +504,16 @@ LZ4HC_encodeSequence(
 		len = length - RUN_MASK;
 		for (; len > 254; len -= 255)
 			*(*op)++ = 255;
-		*(*op)++ = (BYTE) len;
+		*(*op)++ = (BYTE)len;
 	} else
-		*token = (BYTE) (length << ML_BITS);
+		*token = (BYTE)(length << ML_BITS);
 
 	/* Copy Literals */
 	LZ4_wildCopy(*op, *anchor, (*op) + length);
 	*op += length;
 
 	/* Encode Offset */
-	LZ4_writeLE16(*op, (U16) (*ip - match));
+	LZ4_writeLE16(*op, (U16)(*ip - match));
 	*op += 2;
 
 	/* Encode MatchLength */
@@ -532,9 +532,9 @@ LZ4HC_encodeSequence(
 			length -= 255;
 			*(*op)++ = 255;
 		}
-		*(*op)++ = (BYTE) length;
+		*(*op)++ = (BYTE)length;
 	} else
-		*token += (BYTE) (length);
+		*token += (BYTE)(length);
 
 	/* Prepare next loop */
 	*ip += matchLength;
@@ -765,10 +765,10 @@ _Search3:
 			lastRun -= RUN_MASK;
 			for (; lastRun > 254; lastRun -= 255)
 				*op++ = 255;
-			*op++ = (BYTE) lastRun;
+			*op++ = (BYTE)lastRun;
 		} else
-			*op++ = (BYTE) (lastRun << ML_BITS);
-		memcpy(op, anchor, iend - anchor);
+			*op++ = (BYTE)(lastRun << ML_BITS);
+		(void) memcpy(op, anchor, iend - anchor);
 		op += iend - anchor;
 	}
 
@@ -787,7 +787,7 @@ LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
     int srcSize, int maxDstSize, int compressionLevel)
 {
 	/* state should be aligned for pointers (32 or 64 bits) */
-	ASSERT(((size_t) (state) & (sizeof (void *) - 1)) == 0);
+	ASSERT(((size_t)(state) & (sizeof (void *) - 1)) == 0);
 
 	LZ4HC_init((LZ4HC_Data_Structure *) state, (const BYTE *)src);
 	if (maxDstSize < LZ4_compressBound(srcSize))
