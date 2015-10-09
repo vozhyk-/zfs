@@ -38,6 +38,7 @@
 /*
  * ZFS changes:
  *	- LZ4HC_DEBUG removed
+ *	- MSVC-specific code removed
  */
 
 /*
