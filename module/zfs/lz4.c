@@ -325,17 +325,17 @@ LZ4_compressCtx(void *ctx, const char *source, char *dest, int isize,
     int osize)
 {
 	struct refTables *srt = (struct refTables *)ctx;
-	HTYPE *HashTable = (HTYPE *) (srt->hashTable);
+	HTYPE *HashTable = (HTYPE *)(srt->hashTable);
 
-	const BYTE *ip = (BYTE *) source;
+	const BYTE *ip = (BYTE *)source;
 	INITBASE(base);
 	const BYTE *anchor = ip;
 	const BYTE *const iend = ip + isize;
-	const BYTE *const oend = (BYTE *) dest + osize;
+	const BYTE *const oend = (BYTE *)dest + osize;
 	const BYTE *const mflimit = iend - MFLIMIT;
 #define	matchlimit (iend - LASTLITERALS)
 
-	BYTE *op = (BYTE *) dest;
+	BYTE *op = (BYTE *)dest;
 
 	int len, length;
 	const int skipStrength = SKIPSTRENGTH;
@@ -376,7 +376,7 @@ LZ4_compressCtx(void *ctx, const char *source, char *dest, int isize,
 		} while ((ref < ip - MAX_DISTANCE) || (A32(ref) != A32(ip)));
 
 		/* Catch up */
-		while ((ip > anchor) && (ref > (BYTE *) source) &&
+		while ((ip > anchor) && (ref > (BYTE *)source) &&
 		    unlikely(ip[-1] == ref[-1])) {
 			ip--;
 			ref--;
@@ -516,17 +516,17 @@ LZ4_compress64kCtx(void *ctx, const char *source, char *dest, int isize,
     int osize)
 {
 	struct refTables *srt = (struct refTables *)ctx;
-	U16 *HashTable = (U16 *) (srt->hashTable);
+	U16 *HashTable = (U16 *)(srt->hashTable);
 
-	const BYTE *ip = (BYTE *) source;
+	const BYTE *ip = (BYTE *)source;
 	const BYTE *anchor = ip;
 	const BYTE *const base = ip;
 	const BYTE *const iend = ip + isize;
-	const BYTE *const oend = (BYTE *) dest + osize;
+	const BYTE *const oend = (BYTE *)dest + osize;
 	const BYTE *const mflimit = iend - MFLIMIT;
 #define	matchlimit (iend - LASTLITERALS)
 
-	BYTE *op = (BYTE *) dest;
+	BYTE *op = (BYTE *)dest;
 
 	int len, length;
 	const int skipStrength = SKIPSTRENGTH;
@@ -565,7 +565,7 @@ LZ4_compress64kCtx(void *ctx, const char *source, char *dest, int isize,
 		} while (A32(ref) != A32(ip));
 
 		/* Catch up */
-		while ((ip > anchor) && (ref > (BYTE *) source) &&
+		while ((ip > anchor) && (ref > (BYTE *)source) &&
 		    (ip[-1] == ref[-1])) {
 			ip--;
 			ref--;
@@ -735,11 +735,11 @@ LZ4_uncompress_unknownOutputSize(const char *source, char *dest, int isize,
     int maxOutputSize)
 {
 	/* Local Variables */
-	const BYTE *restrict ip = (const BYTE *) source;
+	const BYTE *restrict ip = (const BYTE *)source;
 	const BYTE *const iend = ip + isize;
 	const BYTE *ref;
 
-	BYTE *op = (BYTE *) dest;
+	BYTE *op = (BYTE *)dest;
 	BYTE *const oend = op + maxOutputSize;
 	BYTE *cpy;
 

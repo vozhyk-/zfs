@@ -132,7 +132,7 @@ lz4hc_compress_zfs(void *src, void *dst, size_t s_len, size_t d_len, int level)
 	 * added to the compressed buffer and which, if unhandled, would
 	 * confuse the hell out of our decompression function.
 	 */
-	*(uint32_t *) dest = BE_32(bufsiz);
+	*(uint32_t *)dest = BE_32(bufsiz);
 
 	return (bufsiz + sizeof (bufsiz));
 }
@@ -573,7 +573,7 @@ LZ4HC_compress_generic(
 	int compressionLevel,
 	limitedOutput_directive limit)
 {
-	LZ4HC_Data_Structure *ctx = (LZ4HC_Data_Structure *) ctxvoid;
+	LZ4HC_Data_Structure *ctx = (LZ4HC_Data_Structure *)ctxvoid;
 	const BYTE *ip = (const BYTE *)source;
 	const BYTE *anchor = ip;
 	const BYTE *const iend = ip + inputSize;
@@ -809,15 +809,13 @@ LZ4_compress_HC_extStateHC(void *state, const char *src, char *dst,
 	/* state should be aligned for pointers (32 or 64 bits) */
 	ASSERT(((size_t)(state) & (sizeof (void *) - 1)) == 0);
 
-	LZ4HC_init((LZ4HC_Data_Structure *) state, (const BYTE *)src);
+	LZ4HC_init((LZ4HC_Data_Structure *)state, (const BYTE *)src);
 	if (maxDstSize < LZ4_compressBound(srcSize))
 		return (LZ4HC_compress_generic(state, src, dst, srcSize,
-		    maxDstSize, compressionLevel,
-		    limitedOutput));
+		    maxDstSize, compressionLevel, limitedOutput));
 	else
 		return (LZ4HC_compress_generic(state, src, dst, srcSize,
-		    maxDstSize, compressionLevel,
-		    noLimit));
+		    maxDstSize, compressionLevel, noLimit));
 }
 
 static int
@@ -843,9 +841,8 @@ void
 lz4hc_init(void)
 {
 	lz4hc_cache = kmem_cache_create("lz4hc_cache",
-					LZ4_sizeofStateHC(),
-					sizeof (void *),
-					NULL, NULL, NULL, NULL, NULL, 0);
+	    LZ4_sizeofStateHC(), sizeof (void *),
+	    NULL, NULL, NULL, NULL, NULL, 0);
 }
 
 void
