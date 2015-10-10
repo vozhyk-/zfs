@@ -37,6 +37,7 @@
 
 /*
  * ZFS changes:
+ *	- stream compression removed
  *	- LZ4HC_DEBUG removed
  *	- MSVC-specific code removed
  */
@@ -148,7 +149,7 @@ lz4hc_compress_zfs(void *src, void *dst, size_t s_len, size_t d_len, int level)
 #endif
 #else
 #define	FORCE_INLINE static
-#endif /* __STDC_VERSION__ */
+#endif	/* __STDC_VERSION__ */
 
 /* Memory routines */
 #define	MEM_INIT	memset
@@ -228,8 +229,8 @@ LZ4_wildCopy(void *dstPtr, const void *srcPtr, void *dstEnd)
 
 /* Common functions */
 static unsigned
-LZ4_count(const BYTE * pIn, const BYTE * pMatch,
-    const BYTE * pInLimit)
+LZ4_count(const BYTE *pIn, const BYTE *pMatch,
+    const BYTE *pInLimit)
 {
 	const BYTE *const pStart = pIn;
 
@@ -311,7 +312,7 @@ LZ4HC_hashPtr(const void *ptr)
 
 /* HC Compression */
 static void
-LZ4HC_init(LZ4HC_Data_Structure * hc4, const BYTE * start)
+LZ4HC_init(LZ4HC_Data_Structure *hc4, const BYTE *start)
 {
 	(void) MEM_INIT((void *)hc4->hashTable, 0, sizeof (hc4->hashTable));
 	(void) MEM_INIT(hc4->chainTable, 0xFF, sizeof (hc4->chainTable));
@@ -325,12 +326,12 @@ LZ4HC_init(LZ4HC_Data_Structure * hc4, const BYTE * start)
 
 /* Update chains up to ip (excluded) */
 FORCE_INLINE void
-LZ4HC_Insert(LZ4HC_Data_Structure * hc4, const BYTE * ip)
+LZ4HC_Insert(LZ4HC_Data_Structure *hc4, const BYTE *ip)
 {
 	U16 *chainTable = hc4->chainTable;
 	U32 *HashTable = hc4->hashTable;
 	const BYTE *const base = hc4->base;
-	const U32 target = (U32) (ip - base);
+	const U32 target = (U32)(ip - base);
 	U32 idx = hc4->nextToUpdate;
 
 	while (idx < target) {
@@ -338,7 +339,7 @@ LZ4HC_Insert(LZ4HC_Data_Structure * hc4, const BYTE * ip)
 		size_t delta = idx - HashTable[h];
 		if (delta > MAX_DISTANCE)
 			delta = MAX_DISTANCE;
-		DELTANEXTU16(idx) = (U16) delta;
+		DELTANEXTU16(idx) = (U16)delta;
 		HashTable[h] = idx;
 		idx++;
 	}
@@ -348,10 +349,10 @@ LZ4HC_Insert(LZ4HC_Data_Structure * hc4, const BYTE * ip)
 
 FORCE_INLINE int
 LZ4HC_InsertAndFindBestMatch(
-	LZ4HC_Data_Structure * hc4,	/* Index table will be updated */
-	const BYTE * ip,
-	const BYTE * const iLimit,
-	const BYTE ** matchpos,
+	LZ4HC_Data_Structure *hc4,	/* Index table will be updated */
+	const BYTE *ip,
+	const BYTE *const iLimit,
+	const BYTE **matchpos,
 	const int maxNbAttempts)
 {
 	U16 *const chainTable = hc4->chainTable;
@@ -359,8 +360,8 @@ LZ4HC_InsertAndFindBestMatch(
 	const BYTE *const base = hc4->base;
 	const BYTE *const dictBase = hc4->dictBase;
 	const U32 dictLimit = hc4->dictLimit;
-	const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32) (ip - base)) ?
-	    hc4->lowLimit : (U32) (ip - base) - (64 KB - 1);
+	const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip - base)) ?
+	    hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
 	U32 matchIndex;
 	const BYTE *match;
 	int nbAttempts = maxNbAttempts;
@@ -411,13 +412,13 @@ LZ4HC_InsertAndFindBestMatch(
 }
 
 FORCE_INLINE int
-LZ4HC_InsertAndGetWiderMatch(LZ4HC_Data_Structure * hc4,
-	const BYTE * const ip,
-	const BYTE * const iLowLimit,
-	const BYTE * const iHighLimit,
+LZ4HC_InsertAndGetWiderMatch(LZ4HC_Data_Structure *hc4,
+	const BYTE *const ip,
+	const BYTE *const iLowLimit,
+	const BYTE *const iHighLimit,
 	int longest,
-	const BYTE ** matchpos,
-	const BYTE ** startpos,
+	const BYTE **matchpos,
+	const BYTE **startpos,
 	const int maxNbAttempts)
 {
 	U16 *const chainTable = hc4->chainTable;
@@ -425,8 +426,8 @@ LZ4HC_InsertAndGetWiderMatch(LZ4HC_Data_Structure * hc4,
 	const BYTE *const base = hc4->base;
 	const U32 dictLimit = hc4->dictLimit;
 	const BYTE *const lowPrefixPtr = base + dictLimit;
-	const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32) (ip - base)) ?
-	    hc4->lowLimit : (U32) (ip - base) - (64 KB - 1);
+	const U32 lowLimit = (hc4->lowLimit + 64 KB > (U32)(ip - base)) ?
+	    hc4->lowLimit : (U32)(ip - base) - (64 KB - 1);
 	const BYTE *const dictBase = hc4->dictBase;
 	U32 matchIndex;
 	int nbAttempts = maxNbAttempts;
@@ -501,13 +502,13 @@ typedef enum { noLimit = 0, limitedOutput = 1 } limitedOutput_directive;
 
 FORCE_INLINE int
 LZ4HC_encodeSequence(
-	const BYTE ** ip,
-	BYTE ** op,
-	const BYTE ** anchor,
+	const BYTE **ip,
+	BYTE **op,
+	const BYTE **anchor,
 	int matchLength,
-	const BYTE * const match,
+	const BYTE *const match,
 	limitedOutput_directive
-	limitedOutputBuffer, BYTE * oend)
+	limitedOutputBuffer, BYTE *oend)
 {
 	int length;
 	BYTE *token;
@@ -515,9 +516,10 @@ LZ4HC_encodeSequence(
 	/* Encode Literal length */
 	length = (int)(*ip - *anchor);
 	token = (*op)++;
+	/* Check output limit */
 	if ((limitedOutputBuffer) &&
 	    ((*op + (length >> 8) + length + (2 + 1 + LASTLITERALS)) > oend))
-		return (1);	/* Check output limit */
+		return (1);
 	if (length >= (int)RUN_MASK) {
 		int len;
 		*token = (RUN_MASK << ML_BITS);
@@ -525,8 +527,9 @@ LZ4HC_encodeSequence(
 		for (; len > 254; len -= 255)
 			*(*op)++ = 255;
 		*(*op)++ = (BYTE)len;
-	} else
+	} else {
 		*token = (BYTE)(length << ML_BITS);
+	}
 
 	/* Copy Literals */
 	LZ4_wildCopy(*op, *anchor, (*op) + length);
@@ -553,8 +556,9 @@ LZ4HC_encodeSequence(
 			*(*op)++ = 255;
 		}
 		*(*op)++ = (BYTE)length;
-	} else
+	} else {
 		*token += (BYTE)(length);
+	}
 
 	/* Prepare next loop */
 	*ip += matchLength;
@@ -697,8 +701,8 @@ _Search3:
 			/* Not enough space for match 2 : remove it */
 			if (start3 >= (ip + ml)) {
 				/*
-				 * can write Seq1 immediately
-				 * ==> Seq2 is removed, so Seq3 becomes Seq1
+				 * can write Seq1 immediately ==>
+				 * Seq2 is removed, so Seq3 becomes Seq1
 				 */
 				if (start2 < ip + ml) {
 					int correction =
@@ -778,7 +782,7 @@ _Search3:
 		if ((limit) &&
 		    (((char *)op - dest) + lastRun + 1 +
 		    ((lastRun + 255 - RUN_MASK) / 255) >
-		    (U32) maxOutputSize))
+		    (U32)maxOutputSize))
 			return (0);
 		if (lastRun >= (int)RUN_MASK) {
 			*op++ = (RUN_MASK << ML_BITS);
@@ -786,8 +790,9 @@ _Search3:
 			for (; lastRun > 254; lastRun -= 255)
 				*op++ = 255;
 			*op++ = (BYTE)lastRun;
-		} else
+		} else {
 			*op++ = (BYTE)(lastRun << ML_BITS);
+		}
 		(void) memcpy(op, anchor, iend - anchor);
 		op += iend - anchor;
 	}
