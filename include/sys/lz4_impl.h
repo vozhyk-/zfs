@@ -123,7 +123,7 @@ static unsigned LZ4_NbCommonBytes(register size_t val)
 		if (LZ4_64bits()) {
 #if (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && \
 	!defined(LZ4_FORCE_SW_BITCOUNT)
-			return (__builtin_ctzll((U64) val) >> 3);
+			return (__builtin_ctzll((U64)val) >> 3);
 #else
 			static const int DeBruijnBytePos[64] =
 			    { 0, 0, 0, 0, 0, 1, 1, 2, 0, 3, 1, 3, 1, 4, 2, 7,
@@ -132,20 +132,20 @@ static unsigned LZ4_NbCommonBytes(register size_t val)
 				7, 1, 2, 4, 6, 4, 4, 5, 7, 2, 6, 5, 7, 6, 7, 7
 			};
 			return (DeBruijnBytePos[
-			    ((U64) ((val & -(long long)val) *
+			    ((U64)((val & -(long long)val) *
 			    0x0218A392CDABBD3FULL)) >> 58]);
 #endif
 		} else {	/* 32 bits */
 
 #if (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && \
 	!defined(LZ4_FORCE_SW_BITCOUNT)
-			return (__builtin_ctz((U32) val) >> 3);
+			return (__builtin_ctz((U32)val) >> 3);
 #else
 			static const int DeBruijnBytePos[32] =
 			    { 0, 0, 3, 0, 3, 1, 3, 0, 3, 2, 2, 1, 3, 2, 0, 1,
 				3, 3, 1, 2, 2, 2, 2, 0, 3, 1, 2, 0, 1, 0, 1, 1
 			};
-			return (DeBruijnBytePos[((U32) ((val & -(S32) val) *
+			return (DeBruijnBytePos[((U32)((val & -(S32)val) *
 			    0x077CB531U)) >> 27]);
 #endif
 		}
@@ -154,7 +154,7 @@ static unsigned LZ4_NbCommonBytes(register size_t val)
 		if (LZ4_64bits()) {
 #if (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && \
 	!defined(LZ4_FORCE_SW_BITCOUNT)
-			return (__builtin_clzll((U64) val) >> 3);
+			return (__builtin_clzll((U64)val) >> 3);
 #else
 			unsigned r;
 			if (!(val >> 32)) {
@@ -176,7 +176,7 @@ static unsigned LZ4_NbCommonBytes(register size_t val)
 
 #if (defined(__clang__) || (LZ4_GCC_VERSION >= 304)) && \
 	!defined(LZ4_FORCE_SW_BITCOUNT)
-			return (__builtin_clz((U32) val) >> 3);
+			return (__builtin_clz((U32)val) >> 3);
 #else
 			unsigned r;
 			if (!(val >> 16)) {
