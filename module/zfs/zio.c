@@ -1180,6 +1180,15 @@ zio_write_bp_init(zio_t *zio)
 	if (compress != ZIO_COMPRESS_OFF) {
 		void *cbuf = zio_buf_alloc(lsize);
 		psize = zio_compress_data(compress, zio->io_data, cbuf, lsize);
+
+		/*
+		 * LZ4HC can be decompressed with LZ4,
+		 * so we record it as such
+		 */
+		if (compress >= ZIO_COMPRESS_LZ4HC_1 &&
+		    compress <= ZIO_COMPRESS_LZ4HC_16)
+			compress = ZIO_COMPRESS_LZ4;
+
 		if (psize == 0 || psize == lsize) {
 			compress = ZIO_COMPRESS_OFF;
 			zio_buf_free(cbuf, lsize);
