@@ -165,7 +165,20 @@ compression_changed_cb(void *arg, uint64_t newval)
 	ASSERT(newval != ZIO_COMPRESS_INHERIT);
 
 	os->os_compress = zio_compress_select(os->os_spa, newval,
-	    ZIO_COMPRESS_ON);
+	    ZIO_COMPRESS_ON, ZIO_COMPRESS_INHERIT);
+}
+
+static void
+lz4mode_changed_cb(void *arg, uint64_t newval)
+{
+	objset_t *os = arg;
+
+	/*
+	 * Inheritance and range checking should have been done by now.
+	 */
+	ASSERT(newval != ZIO_COMPRESS_INHERIT);
+
+	os->os_lz4mode = newval;
 }
 
 static void
@@ -380,6 +393,11 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 				err = dsl_prop_register(ds,
 				    zfs_prop_to_name(ZFS_PROP_COMPRESSION),
 				    compression_changed_cb, os);
+			}
+			if (err == 0) {
+				err = dsl_prop_register(ds,
+				    zfs_prop_to_name(ZFS_PROP_LZ4MODE),
+				    lz4mode_changed_cb, os);
 			}
 			if (err == 0) {
 				err = dsl_prop_register(ds,
@@ -696,6 +714,9 @@ dmu_objset_evict(objset_t *os)
 			VERIFY0(dsl_prop_unregister(ds,
 			    zfs_prop_to_name(ZFS_PROP_COMPRESSION),
 			    compression_changed_cb, os));
+			VERIFY0(dsl_prop_unregister(ds,
+			    zfs_prop_to_name(ZFS_PROP_LZ4MODE),
+			    lz4mode_changed_cb, os));
 			VERIFY0(dsl_prop_unregister(ds,
 			    zfs_prop_to_name(ZFS_PROP_COPIES),
 			    copies_changed_cb, os));

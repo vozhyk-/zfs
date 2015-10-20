@@ -99,6 +99,11 @@ zfs_prop_init(void)
 		{ "gzip-9",	ZIO_COMPRESS_GZIP_9 },
 		{ "zle",	ZIO_COMPRESS_ZLE },
 		{ "lz4",	ZIO_COMPRESS_LZ4 },
+		{ NULL }
+	};
+
+	static zprop_index_t lz4mode_table[] = {
+		{ "lz4",	ZIO_COMPRESS_LZ4 },
 		{ "lz4hc",	ZIO_COMPRESS_LZ4HC_9 },  /* lz4hc default */
 		{ "lz4hc-1",	ZIO_COMPRESS_LZ4HC_1 },
 		{ "lz4hc-1",	ZIO_COMPRESS_LZ4HC_1 },
@@ -257,9 +262,12 @@ zfs_prop_init(void)
 	zprop_register_index(ZFS_PROP_COMPRESSION, "compression",
 	    ZIO_COMPRESS_DEFAULT, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "on | off | lzjb | gzip | gzip-[1-9] | zle | lz4 | "
-	    "lz4hc | lz4hc-[1-16]",
+	    "on | off | lzjb | gzip | gzip-[1-9] | zle | lz4",
 	    "COMPRESS", compress_table);
+	zprop_register_index(ZFS_PROP_LZ4MODE, "lz4mode",
+	    LZ4MODE_DEFAULT, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
+	    "lz4 | lz4hc-{1..16}", "LZ4MODE", lz4mode_table);
 	zprop_register_index(ZFS_PROP_SNAPDIR, "snapdir", ZFS_SNAPDIR_HIDDEN,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "hidden | visible", "SNAPDIR", snapdir_table);

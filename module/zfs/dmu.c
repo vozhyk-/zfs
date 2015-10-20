@@ -1856,6 +1856,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 	    (wp & WP_SPILL));
 	enum zio_checksum checksum = os->os_checksum;
 	enum zio_compress compress = os->os_compress;
+	enum zio_compress lz4mode = os->os_lz4mode;
 	enum zio_checksum dedup_checksum = os->os_dedup_checksum;
 	boolean_t dedup = B_FALSE;
 	boolean_t nopwrite = B_FALSE;
@@ -1878,7 +1879,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 			 * that specializes in arrays of bps.
 			 */
 			compress = zio_compress_select(os->os_spa,
-			    ZIO_COMPRESS_ON, ZIO_COMPRESS_ON);
+			    ZIO_COMPRESS_ON, ZIO_COMPRESS_ON, lz4mode);
 		}
 
 		/*
@@ -1912,7 +1913,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 		checksum = ZIO_CHECKSUM_OFF;
 	} else {
 		compress = zio_compress_select(os->os_spa, dn->dn_compress,
-		    compress);
+		    compress, lz4mode);
 
 		checksum = (dedup_checksum == ZIO_CHECKSUM_OFF) ?
 		    zio_checksum_select(dn->dn_checksum, checksum) :

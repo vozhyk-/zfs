@@ -83,7 +83,7 @@ zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS] = {
 
 enum zio_compress
 zio_compress_select(spa_t *spa, enum zio_compress child,
-    enum zio_compress parent)
+    enum zio_compress parent, enum zio_compress lz4mode)
 {
 	enum zio_compress result;
 
@@ -101,6 +101,11 @@ zio_compress_select(spa_t *spa, enum zio_compress child,
 		else
 			result = ZIO_COMPRESS_LEGACY_ON_VALUE;
 	}
+
+	/* lz4mode == ZIO_COMPRESS_INHERIT means using LZ4 */
+	if (lz4mode != ZIO_COMPRESS_INHERIT &&
+	    result == ZIO_COMPRESS_LZ4)
+		result = lz4mode;
 
 	return (result);
 }

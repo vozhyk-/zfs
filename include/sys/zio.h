@@ -148,6 +148,7 @@ enum zio_compress {
 #define	ZIO_COMPRESS_LZ4_ON_VALUE	ZIO_COMPRESS_LZ4
 
 #define	ZIO_COMPRESS_DEFAULT		ZIO_COMPRESS_OFF
+#define	LZ4MODE_DEFAULT			ZIO_COMPRESS_LZ4
 
 #define	BOOTFS_COMPRESS_VALID(compress)			\
 	((compress) == ZIO_COMPRESS_LZJB ||		\
@@ -566,7 +567,8 @@ extern enum zio_checksum zio_checksum_select(enum zio_checksum child,
 extern enum zio_checksum zio_checksum_dedup_select(spa_t *spa,
     enum zio_checksum child, enum zio_checksum parent);
 extern enum zio_compress zio_compress_select(spa_t *spa,
-    enum zio_compress child, enum zio_compress parent);
+    enum zio_compress child, enum zio_compress parent,
+    enum zio_compress lz4mode);
 
 extern void zio_suspend(spa_t *spa, zio_t *zio);
 extern int zio_resume(spa_t *spa);
