@@ -267,7 +267,7 @@ zfs_prop_init(void)
 	zprop_register_index(ZFS_PROP_LZ4MODE, "lz4mode",
 	    LZ4MODE_DEFAULT, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "lz4 | lz4hc-{1..16}", "LZ4MODE", lz4mode_table);
+	    "lz4 | lz4hc | lz4hc-{1..16}", "LZ4MODE", lz4mode_table);
 	zprop_register_index(ZFS_PROP_SNAPDIR, "snapdir", ZFS_SNAPDIR_HIDDEN,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "hidden | visible", "SNAPDIR", snapdir_table);
