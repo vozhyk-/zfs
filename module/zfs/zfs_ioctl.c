@@ -3738,9 +3738,7 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 			    SPA_VERSION_ZLE_COMPRESSION))
 				return (SET_ERROR(ENOTSUP));
 
-			if (intval == ZIO_COMPRESS_LZ4 ||
-			    (intval >= ZIO_COMPRESS_LZ4HC_1 &&
-			    intval <= ZIO_COMPRESS_LZ4HC_16)) {
+			if (intval == ZIO_COMPRESS_LZ4) {
 				spa_t *spa;
 
 				if ((err = spa_open(dsname, &spa, FTAG)) != 0)
