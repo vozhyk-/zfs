@@ -3133,8 +3133,9 @@ dump_zpool(spa_t *spa)
 				ASSERT0(dataset_feature_count[f]);
 				continue;
 			}
-			(void) feature_get_refcount(spa,
-			    &spa_feature_table[f], &refcount);
+			if (feature_get_refcount(spa, &spa_feature_table[f],
+			    &refcount) == ENOTSUP)
+				continue;
 			if (dataset_feature_count[f] != refcount) {
 				(void) printf("%s feature refcount mismatch: "
 				    "%lld datasets != %lld refcount\n",
