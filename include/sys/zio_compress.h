@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2015 by Witaut Bajaryn. All rights reserved.
  */
 
 #ifndef _SYS_ZIO_COMPRESS_H
@@ -52,6 +53,27 @@ enum zio_compress {
 	ZIO_COMPRESS_FUNCTIONS
 };
 
+/* Stored in BP, used for selecting decompression function */
+enum bp_compress {
+	BP_COMPRESS_INHERIT = 0,	/* invalid */
+	BP_COMPRESS_ON,			/* invalid */
+	BP_COMPRESS_OFF,
+	BP_COMPRESS_LZJB,
+	BP_COMPRESS_EMPTY,
+	BP_COMPRESS_GZIP_1,
+	BP_COMPRESS_GZIP_2,
+	BP_COMPRESS_GZIP_3,
+	BP_COMPRESS_GZIP_4,
+	BP_COMPRESS_GZIP_5,
+	BP_COMPRESS_GZIP_6,
+	BP_COMPRESS_GZIP_7,
+	BP_COMPRESS_GZIP_8,
+	BP_COMPRESS_GZIP_9,
+	BP_COMPRESS_ZLE,
+	BP_COMPRESS_LZ4,
+	BP_COMPRESS_VALUES
+};
+
 /* Common signature for all zio compress functions. */
 typedef size_t zio_compress_func_t(void *src, void *dst,
     size_t s_len, size_t d_len, int);
@@ -64,12 +86,22 @@ typedef int zio_decompress_func_t(void *src, void *dst,
  */
 typedef const struct zio_compress_info {
 	zio_compress_func_t	*ci_compress;	/* compression function */
-	zio_decompress_func_t	*ci_decompress;	/* decompression function */
+	enum bp_compress	ci_bp_compress_value;
+						/* value stored in BP */
 	int			ci_level;	/* level parameter */
 	char			*ci_name;	/* algorithm name */
 } zio_compress_info_t;
 
+typedef const struct zio_decompress_info {
+	zio_decompress_func_t	*di_decompress;	/* decompression function */
+	int			di_level;	/* level parameter */
+	char			*di_name;	/* algorithm name */
+} zio_decompress_info_t;
+
 extern zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS];
+extern zio_decompress_info_t zio_decompress_table[BP_COMPRESS_VALUES];
+
+#define	BP_COMPRESS_VALUE(C)	(zio_compress_table[C].ci_bp_compress_value)
 
 /*
  * lz4 compression init & free
@@ -102,7 +134,7 @@ extern int lz4_decompress_zfs(void *src, void *dst, size_t s_len, size_t d_len,
  */
 extern size_t zio_compress_data(enum zio_compress c, void *src, void *dst,
     size_t s_len);
-extern int zio_decompress_data(enum zio_compress c, void *src, void *dst,
+extern int zio_decompress_data(enum bp_compress c, void *src, void *dst,
     size_t s_len, size_t d_len);
 
 #ifdef	__cplusplus
