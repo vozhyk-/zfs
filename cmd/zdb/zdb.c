@@ -3428,7 +3428,7 @@ zdb_read_block(char *thing, spa_t *spa)
 
 	BP_SET_LSIZE(bp, lsize);
 	BP_SET_PSIZE(bp, psize);
-	BP_SET_COMPRESS(bp, ZIO_COMPRESS_OFF);
+	BP_SET_COMPRESS(bp, BP_COMPRESS_OFF);
 	BP_SET_CHECKSUM(bp, ZIO_CHECKSUM_OFF);
 	BP_SET_TYPE(bp, DMU_OT_NONE);
 	BP_SET_LEVEL(bp, 0);
@@ -3469,7 +3469,7 @@ zdb_read_block(char *thing, spa_t *spa)
 		 * We don't know how the data was compressed, so just try
 		 * every decompress function at every inflated blocksize.
 		 */
-		enum zio_compress c;
+		enum bp_compress c;
 		void *pbuf2 = umem_alloc(SPA_MAXBLOCKSIZE, UMEM_NOFAIL);
 		void *lbuf2 = umem_alloc(SPA_MAXBLOCKSIZE, UMEM_NOFAIL);
 
@@ -3483,7 +3483,7 @@ zdb_read_block(char *thing, spa_t *spa)
 
 		for (lsize = SPA_MAXBLOCKSIZE; lsize > psize;
 		    lsize -= SPA_MINBLOCKSIZE) {
-			for (c = 0; c < ZIO_COMPRESS_FUNCTIONS; c++) {
+			for (c = 0; c < BP_COMPRESS_VALUES; c++) {
 				if (zio_decompress_data(c, pbuf, lbuf,
 				    psize, lsize) == 0 &&
 				    zio_decompress_data(c, pbuf2, lbuf2,
@@ -3491,7 +3491,7 @@ zdb_read_block(char *thing, spa_t *spa)
 				    bcmp(lbuf, lbuf2, lsize) == 0)
 					break;
 			}
-			if (c != ZIO_COMPRESS_FUNCTIONS)
+			if (c != BP_COMPRESS_VALUES)
 				break;
 			lsize -= SPA_MINBLOCKSIZE;
 		}

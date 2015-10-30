@@ -118,6 +118,27 @@ enum zio_compress {
 	ZIO_COMPRESS_FUNCTIONS
 };
 
+/* Stored in BP, used for selecting decompression function */
+enum bp_compress {
+	BP_COMPRESS_INHERIT = 0,	/* invalid */
+	BP_COMPRESS_ON,			/* invalid */
+	BP_COMPRESS_OFF,
+	BP_COMPRESS_LZJB,
+	BP_COMPRESS_EMPTY,
+	BP_COMPRESS_GZIP_1,
+	BP_COMPRESS_GZIP_2,
+	BP_COMPRESS_GZIP_3,
+	BP_COMPRESS_GZIP_4,
+	BP_COMPRESS_GZIP_5,
+	BP_COMPRESS_GZIP_6,
+	BP_COMPRESS_GZIP_7,
+	BP_COMPRESS_GZIP_8,
+	BP_COMPRESS_GZIP_9,
+	BP_COMPRESS_ZLE,
+	BP_COMPRESS_LZ4,
+	BP_COMPRESS_VALUES
+};
+
 /*
  * The number of "legacy" compression functions which can be set on individual
  * objects.

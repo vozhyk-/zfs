@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2015 Witaut Bajaryn.  All rights reserved.
+ */
+
 #ifndef _SYS_ZIO_COMPRESS_H
 #define	_SYS_ZIO_COMPRESS_H
 
@@ -45,12 +49,22 @@ typedef int zio_decompress_func_t(void *src, void *dst,
  */
 typedef const struct zio_compress_info {
 	zio_compress_func_t	*ci_compress;	/* compression function */
-	zio_decompress_func_t	*ci_decompress;	/* decompression function */
+	enum bp_compress	ci_bp_compress_value;
+						/* value stored in BP */
 	int			ci_level;	/* level parameter */
 	char			*ci_name;	/* algorithm name */
 } zio_compress_info_t;
 
+typedef const struct zio_decompress_info {
+	zio_decompress_func_t	*di_decompress;	/* decompression function */
+	int			di_level;	/* level parameter */
+	char			*di_name;	/* algorithm name */
+} zio_decompress_info_t;
+
 extern zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS];
+extern zio_decompress_info_t zio_decompress_table[BP_COMPRESS_VALUES];
+
+#define	BP_COMPRESS_VALUE(C)	(zio_compress_table[C].ci_bp_compress_value)
 
 /*
  * lz4 compression init & free
@@ -83,7 +97,7 @@ extern int lz4_decompress_zfs(void *src, void *dst, size_t s_len, size_t d_len,
  */
 extern size_t zio_compress_data(enum zio_compress c, void *src, void *dst,
     size_t s_len);
-extern int zio_decompress_data(enum zio_compress c, void *src, void *dst,
+extern int zio_decompress_data(enum bp_compress c, void *src, void *dst,
     size_t s_len, size_t d_len);
 
 #ifdef	__cplusplus
