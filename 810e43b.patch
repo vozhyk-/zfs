@@ -44,10 +44,10 @@ index bb552ac..57eefe7 100644
 +	    "com.joyent:multi_vdev_crash_dump", "multi_vdev_crash_dump",
 +	    "Crash dumps to multiple vdev pools.", B_FALSE, B_FALSE, NULL);
  }
-diff --git a/usr/src/common/zfs/zfeature_common.h b/usr/src/common/zfs/zfeature_common.h
+diff --git a/include/zfeature_common.h b/include/zfeature_common.h
 index f3a137f..1c5aaf9 100644
---- a/usr/src/common/zfs/zfeature_common.h
-+++ b/usr/src/common/zfs/zfeature_common.h
+--- a/include/zfeature_common.h
++++ b/include/zfeature_common.h
 @@ -22,6 +22,7 @@
  /*
   * Copyright (c) 2012 by Delphix. All rights reserved.
@@ -181,10 +181,10 @@ index c4d579d..9ab3ef4 100644
  .sp
  Changing this property affects only newly-written data.
  .RE
-diff --git a/usr/src/man/man5/zpool-features.5 b/usr/src/man/man5/zpool-features.5
+diff --git a/man/man5/zpool-features.5 b/man/man5/zpool-features.5
 index a306e43..c75ac1e 100644
---- a/usr/src/man/man5/zpool-features.5
-+++ b/usr/src/man/man5/zpool-features.5
+--- a/man/man5/zpool-features.5
++++ b/man/man5/zpool-features.5
 @@ -1,6 +1,7 @@
  '\" te
  .\" Copyright (c) 2012 by Delphix. All rights reserved.
