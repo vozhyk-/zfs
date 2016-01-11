@@ -1,0 +1,973 @@
+From 810e43b2eb0e320833671a403fdda51917e8b036 Mon Sep 17 00:00:00 2001
+From: Bill Pijewski <wdp@joyent.com>
+Date: Thu, 22 Aug 2013 19:03:54 +0000
+Subject: [PATCH] 2932 support crash dumps to raidz, etc. pools Reviewed by:
+ Jerry Jelinek <jerry.jelinek@joyent.com> Reviewed by: Matthew Ahrens
+ <mahrens@delphix.com> Approved by: Dan McDonald <danmcd@nexenta.com>
+
+---
+ module/zfs/zfeature_common.c       |   4 +
+ include/zfeature_common.h       |   2 +
+ module/zcommon/zfs_prop.c              |   2 +
+ lib/libzfs/libzfs_pool.c    |  19 ++-
+ man/man8/zfs.8                   |  13 +-
+ man/man5/zpool-features.5          |  22 ++++
+ module/zfs/dbuf.c           |   4 +-
+ module/zfs/dmu.c            |   4 +-
+ include/sys/vdev_disk.h  |  14 ++-
+ include/sys/vdev_raidz.h |  48 ++++++++
+ include/sys/zio.h        |   2 +
+ module/zfs/vdev_disk.c      |  28 ++++-
+ module/zfs/vdev_raidz.c     | 184 +++++++++++++++++++++++++++--
+ module/zfs/zio_checksum.c   |   2 +
+ module/zfs/zvol.c           | 119 +++++++++++++++----
+ 15 files changed, 404 insertions(+), 63 deletions(-)
+ create mode 100644 include/sys/vdev_raidz.h
+
+diff --git a/module/zfs/zfeature_common.c b/module/zfs/zfeature_common.c
+index bb552ac..57eefe7 100644
+--- a/module/zfs/zfeature_common.c
++++ b/module/zfs/zfeature_common.c
+@@ -22,6 +22,7 @@
+ /*
+  * Copyright (c) 2012 by Delphix. All rights reserved.
+  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ #ifdef _KERNEL
+@@ -160,4 +161,7 @@ zpool_feature_init(void)
+ 	zfeature_register(SPA_FEATURE_LZ4_COMPRESS,
+ 	    "org.illumos:lz4_compress", "lz4_compress",
+ 	    "LZ4 compression algorithm support.", B_FALSE, B_FALSE, NULL);
++	zfeature_register(SPA_FEATURE_MULTI_VDEV_CRASH_DUMP,
++	    "com.joyent:multi_vdev_crash_dump", "multi_vdev_crash_dump",
++	    "Crash dumps to multiple vdev pools.", B_FALSE, B_FALSE, NULL);
+ }
+diff --git a/usr/src/common/zfs/zfeature_common.h b/usr/src/common/zfs/zfeature_common.h
+index f3a137f..1c5aaf9 100644
+--- a/usr/src/common/zfs/zfeature_common.h
++++ b/usr/src/common/zfs/zfeature_common.h
+@@ -22,6 +22,7 @@
+ /*
+  * Copyright (c) 2012 by Delphix. All rights reserved.
+  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ #ifndef _ZFEATURE_COMMON_H
+@@ -54,6 +55,7 @@ enum spa_feature {
+ 	SPA_FEATURE_ASYNC_DESTROY,
+ 	SPA_FEATURE_EMPTY_BPOBJ,
+ 	SPA_FEATURE_LZ4_COMPRESS,
++	SPA_FEATURE_MULTI_VDEV_CRASH_DUMP,
+ 	SPA_FEATURES
+ } spa_feature_t;
+ 
+diff --git a/module/zcommon/zfs_prop.c b/module/zcommon/zfs_prop.c
+index baa7926..0c9048e 100644
+--- a/module/zcommon/zfs_prop.c
++++ b/module/zcommon/zfs_prop.c
+@@ -22,6 +22,7 @@
+  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Copyright (c) 2012 by Delphix. All rights reserved.
+  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ /* Portions Copyright 2010 Robert Milkowski */
+@@ -69,6 +70,7 @@ zfs_prop_init(void)
+ 		{ "fletcher2",	ZIO_CHECKSUM_FLETCHER_2 },
+ 		{ "fletcher4",	ZIO_CHECKSUM_FLETCHER_4 },
+ 		{ "sha256",	ZIO_CHECKSUM_SHA256 },
++		{ "noparity",	ZIO_CHECKSUM_NOPARITY },
+ 		{ NULL }
+ 	};
+ 
+diff --git a/lib/libzfs/libzfs_pool.c b/lib/libzfs/libzfs_pool.c
+index 19d1ff7..55e1022 100644
+--- a/lib/libzfs/libzfs_pool.c
++++ b/lib/libzfs/libzfs_pool.c
+@@ -23,6 +23,7 @@
+  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+  * Copyright (c) 2012 by Delphix. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ #include <ctype.h>
+@@ -3958,9 +3959,7 @@ supported_dump_vdev_type(libzfs_handle_t *hdl, nvlist_t *config, char *errbuf)
+ 	uint_t children, c;
+ 
+ 	verify(nvlist_lookup_string(config, ZPOOL_CONFIG_TYPE, &type) == 0);
+-	if (strcmp(type, VDEV_TYPE_RAIDZ) == 0 ||
+-	    strcmp(type, VDEV_TYPE_FILE) == 0 ||
+-	    strcmp(type, VDEV_TYPE_LOG) == 0 ||
++	if (strcmp(type, VDEV_TYPE_FILE) == 0 ||
+ 	    strcmp(type, VDEV_TYPE_HOLE) == 0 ||
+ 	    strcmp(type, VDEV_TYPE_MISSING) == 0) {
+ 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+@@ -3979,8 +3978,12 @@ supported_dump_vdev_type(libzfs_handle_t *hdl, nvlist_t *config, char *errbuf)
+ }
+ 
+ /*
+- * check if this zvol is allowable for use as a dump device; zero if
+- * it is, > 0 if it isn't, < 0 if it isn't a zvol
++ * Check if this zvol is allowable for use as a dump device; zero if
++ * it is, > 0 if it isn't, < 0 if it isn't a zvol.
++ *
++ * Allowable storage configurations include mirrors, all raidz variants, and
++ * pools with log, cache, and spare devices.  Pools which are backed by files or
++ * have missing/hole vdevs are not suitable.
+  */
+ int
+ zvol_check_dump_config(char *arg)
+@@ -4042,12 +4045,6 @@ zvol_check_dump_config(char *arg)
+ 
+ 	verify(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
+ 	    &top, &toplevels) == 0);
+-	if (toplevels != 1) {
+-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+-		    "'%s' has multiple top level vdevs"), poolname);
+-		(void) zfs_error(hdl, EZFS_DEVOVERFLOW, errbuf);
+-		goto out;
+-	}
+ 
+ 	if (!supported_dump_vdev_type(hdl, top[0], errbuf)) {
+ 		goto out;
+diff --git a/man/man8/zfs.8 b/man/man8/zfs.8
+index c4d579d..9ab3ef4 100644
+--- a/man/man8/zfs.8
++++ b/man/man8/zfs.8
+@@ -23,9 +23,9 @@
+ .\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
+ .\" Copyright 2011 Joshua M. Clulow <josh@sysmgr.org>
+ .\" Copyright (c) 2012 by Delphix. All rights reserved.
+-.\" Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ .\" Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
+ .\" Copyright 2013 Nexenta Systems, Inc.  All Rights Reserved.
++.\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ .\"
+ .TH ZFS 1M "Jan 26, 2013"
+ .SH NAME
+@@ -106,7 +106,7 @@ zfs \- configures ZFS file systems
+ 
+ .LP
+ .nf
+-\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hp\fR][\fB-o\fR \fIfield\fR[,\fIfield\fR]...] [\fB-t\fR \fItype\fR[,\fItype\fR]...] 
++\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hp\fR][\fB-o\fR \fIfield\fR[,\fIfield\fR]...] [\fB-t\fR \fItype\fR[,\fItype\fR]...]
+     [\fB-s\fR \fIsource\fR[,\fIsource\fR]...] \fBall\fR | \fIproperty\fR[,\fIproperty\fR]...
+     \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR...
+ .fi
+@@ -934,15 +934,18 @@ This property is not inherited.
+ .ne 2
+ .na
+ \fB\fBchecksum\fR=\fBon\fR | \fBoff\fR | \fBfletcher2\fR | \fBfletcher4\fR |
+-\fBsha256\fR\fR
++\fBsha256\fR | \fBnoparity\fR \fR
+ .ad
+ .sp .6
+ .RS 4n
+ Controls the checksum used to verify data integrity. The default value is
+ \fBon\fR, which automatically selects an appropriate algorithm (currently,
+ \fBfletcher4\fR, but this may change in future releases). The value \fBoff\fR
+-disables integrity checking on user data. Disabling checksums is \fBNOT\fR a
+-recommended practice.
++disables integrity checking on user data. The value \fBnoparity\fR not only
++disables integrity but also disables maintaining parity for user data.  This
++setting is used internally by a dump device residing on a RAID-Z pool and should
++not be used by any other dataset. Disabling checksums is \fBNOT\fR a recommended
++practice.
+ .sp
+ Changing this property affects only newly-written data.
+ .RE
+diff --git a/usr/src/man/man5/zpool-features.5 b/usr/src/man/man5/zpool-features.5
+index a306e43..c75ac1e 100644
+--- a/usr/src/man/man5/zpool-features.5
++++ b/usr/src/man/man5/zpool-features.5
+@@ -1,6 +1,7 @@
+ '\" te
+ .\" Copyright (c) 2012 by Delphix. All rights reserved.
+ .\" Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
++.\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ .\" The contents of this file are subject to the terms of the Common Development
+ .\" and Distribution License (the "License").  You may not use this file except
+ .\" in compliance with the License. You can obtain a copy of the license at
+@@ -231,5 +232,26 @@ moment, this operation cannot be reversed. Booting off of
+ 
+ .RE
+ 
++.sp
++.ne 2
++.na
++\fB\fBmulti_vdev_crash_dump\fR\fR
++.ad
++.RS 4n
++.TS
++l l .
++GUID	com.joyent:multi_vdev_crash_dump
++READ\-ONLY COMPATIBLE	no
++DEPENDENCIES	none
++.TE
++
++This feature allows a dump device to be configured with a pool comprised
++of multiple vdevs.  Those vdevs may be arranged in any mirrored or raidz
++configuration.
++
++When the \fBmulti_vdev_crash_dump\fR feature is set to \fBenabled\fR,
++the administrator can use the \fBdumpadm\fR(1M) command to configure a
++dump device on a pool comprised of multiple vdevs.
++
+ .SH "SEE ALSO"
+ \fBzpool\fR(1M)
+diff --git a/module/zfs/dbuf.c b/module/zfs/dbuf.c
+index 4056775..9bf5521 100644
+--- a/module/zfs/dbuf.c
++++ b/module/zfs/dbuf.c
+@@ -23,6 +23,7 @@
+  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+  * Copyright (c) 2013 by Delphix. All rights reserved.
+  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ #include <sys/zfs_context.h>
+@@ -2751,7 +2752,8 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
+ 		    dr->dt.dl.dr_copies, dr->dt.dl.dr_nopwrite);
+ 		mutex_exit(&db->db_mtx);
+ 	} else if (db->db_state == DB_NOFILL) {
+-		ASSERT(zp.zp_checksum == ZIO_CHECKSUM_OFF);
++		ASSERT(zp.zp_checksum == ZIO_CHECKSUM_OFF ||
++		    zp.zp_checksum == ZIO_CHECKSUM_NOPARITY);
+ 		dr->dr_zio = zio_write(zio, os->os_spa, txg,
+ 		    db->db_blkptr, NULL, db->db.db_size, &zp,
+ 		    dbuf_write_nofill_ready, dbuf_write_nofill_done, db,
+diff --git a/module/zfs/dmu.c b/module/zfs/dmu.c
+index f81c4eb..27a421a 100644
+--- a/module/zfs/dmu.c
++++ b/module/zfs/dmu.c
+@@ -22,8 +22,8 @@
+  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Copyright (c) 2013 by Delphix. All rights reserved.
+  */
+-
+ /* Copyright (c) 2013 by Saso Kiselkov. All rights reserved. */
++/* Copyright (c) 2013, Joyent, Inc. All rights reserved. */
+ 
+ #include <sys/dmu.h>
+ #include <sys/dmu_impl.h>
+@@ -1597,7 +1597,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
+ 		 * pipeline.
+ 		 */
+ 		compress = ZIO_COMPRESS_OFF;
+-		checksum = ZIO_CHECKSUM_OFF;
++		checksum = ZIO_CHECKSUM_NOPARITY;
+ 	} else {
+ 		compress = zio_compress_select(dn->dn_compress, compress);
+ 
+diff --git a/include/sys/vdev_disk.h b/include/sys/vdev_disk.h
+index b748571..9055d0e 100644
+--- a/include/sys/vdev_disk.h
++++ b/include/sys/vdev_disk.h
+@@ -21,13 +21,12 @@
+ /*
+  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+  * Use is subject to license terms.
++ * Copyright (c) 2013 Joyent, Inc. All rights reserved.
+  */
+ 
+ #ifndef _SYS_VDEV_DISK_H
+ #define	_SYS_VDEV_DISK_H
+ 
+-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+-
+ #include <sys/vdev.h>
+ #ifdef _KERNEL
+ #include <sys/buf.h>
+@@ -40,14 +39,23 @@
+ extern "C" {
+ #endif
+ 
++#ifdef _KERNEL
+ typedef struct vdev_disk {
+ 	ddi_devid_t	vd_devid;
+ 	char		*vd_minor;
+ 	ldi_handle_t	vd_lh;
+ } vdev_disk_t;
++#endif
+ 
++extern int vdev_disk_physio(vdev_t *,
++    caddr_t, size_t, uint64_t, int, boolean_t);
++
++/*
++ * Since vdev_disk.c is not compiled into libzpool, this function should only be
++ * defined in the zfs kernel module.
++ */
+ #ifdef _KERNEL
+-extern int vdev_disk_physio(ldi_handle_t, caddr_t, size_t, uint64_t, int);
++extern int vdev_disk_ldi_physio(ldi_handle_t, caddr_t, size_t, uint64_t, int);
+ #endif
+ #ifdef	__cplusplus
+ }
+diff --git a/include/sys/vdev_raidz.h b/include/sys/vdev_raidz.h
+new file mode 100644
+index 0000000..579d272
+--- /dev/null
++++ b/include/sys/vdev_raidz.h
+@@ -0,0 +1,48 @@
++/*
++ * CDDL HEADER START
++ *
++ * The contents of this file are subject to the terms of the
++ * Common Development and Distribution License (the "License").
++ * You may not use this file except in compliance with the License.
++ *
++ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
++ * or http://www.opensolaris.org/os/licensing.
++ * See the License for the specific language governing permissions
++ * and limitations under the License.
++ *
++ * When distributing Covered Code, include this CDDL HEADER in each
++ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
++ * If applicable, add the following below this CDDL HEADER, with the
++ * fields enclosed by brackets "[]" replaced with your own identifying
++ * information: Portions Copyright [yyyy] [name of copyright owner]
++ *
++ * CDDL HEADER END
++ */
++/*
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
++ */
++
++#ifndef _SYS_VDEV_RAIDZ_H
++#define	_SYS_VDEV_RAIDZ_H
++
++#include <sys/vdev.h>
++#include <sys/semaphore.h>
++#ifdef _KERNEL
++#include <sys/ddi.h>
++#include <sys/sunldi.h>
++#include <sys/sunddi.h>
++#endif
++
++#ifdef	__cplusplus
++extern "C" {
++#endif
++
++#ifdef _KERNEL
++extern int vdev_raidz_physio(vdev_t *,
++    caddr_t, size_t, uint64_t, uint64_t, boolean_t, boolean_t);
++#endif
++#ifdef	__cplusplus
++}
++#endif
++
++#endif	/* _SYS_VDEV_RAIDZ_H */
+diff --git a/include/sys/zio.h b/include/sys/zio.h
+index 1ce087e..75a2bbc 100644
+--- a/include/sys/zio.h
++++ b/include/sys/zio.h
+@@ -24,6 +24,7 @@
+  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+  * Copyright (c) 2012 by Delphix. All rights reserved.
+  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ #ifndef _ZIO_H
+@@ -79,6 +80,7 @@ enum zio_checksum {
+ 	ZIO_CHECKSUM_FLETCHER_4,
+ 	ZIO_CHECKSUM_SHA256,
+ 	ZIO_CHECKSUM_ZILOG2,
++	ZIO_CHECKSUM_NOPARITY,
+ 	ZIO_CHECKSUM_FUNCTIONS
+ };
+ 
+diff --git a/module/zfs/vdev_disk.c b/module/zfs/vdev_disk.c
+index 5cd0670..d9e9357 100644
+--- a/module/zfs/vdev_disk.c
++++ b/module/zfs/vdev_disk.c
+@@ -22,6 +22,7 @@
+  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Copyright (c) 2013 by Delphix. All rights reserved.
+  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
++ * Copyright 2013 Joyent, Inc.  All rights reserved.
+  */
+ 
+ #include <sys/zfs_context.h>
+@@ -426,8 +427,29 @@ vdev_disk_close(vdev_t *vd)
+ }
+ 
+ int
+-vdev_disk_physio(ldi_handle_t vd_lh, caddr_t data, size_t size,
+-    uint64_t offset, int flags)
++vdev_disk_physio(vdev_t *vd, caddr_t data,
++    size_t size, uint64_t offset, int flags, boolean_t isdump)
++{
++	vdev_disk_t *dvd = vd->vdev_tsd;
++
++	ASSERT(vd->vdev_ops == &vdev_disk_ops);
++
++	/*
++	 * If in the context of an active crash dump, use the ldi_dump(9F)
++	 * call instead of ldi_strategy(9F) as usual.
++	 */
++	if (isdump) {
++		ASSERT3P(dvd, !=, NULL);
++		return (ldi_dump(dvd->vd_lh, data, lbtodb(offset),
++		    lbtodb(size)));
++	}
++
++	return (vdev_disk_ldi_physio(dvd->vd_lh, data, size, offset, flags));
++}
++
++int
++vdev_disk_ldi_physio(ldi_handle_t vd_lh, caddr_t data,
++    size_t size, uint64_t offset, int flags)
+ {
+ 	buf_t *bp;
+ 	int error = 0;
+@@ -675,7 +697,7 @@ vdev_disk_read_rootlabel(char *devpath, char *devid, nvlist_t **config)
+ 
+ 		/* read vdev label */
+ 		offset = vdev_label_offset(size, l, 0);
+-		if (vdev_disk_physio(vd_lh, (caddr_t)label,
++		if (vdev_disk_ldi_physio(vd_lh, (caddr_t)label,
+ 		    VDEV_SKIP_SIZE + VDEV_PHYS_SIZE, offset, B_READ) != 0)
+ 			continue;
+ 
+diff --git a/module/zfs/vdev_raidz.c b/module/zfs/vdev_raidz.c
+index f5084fa..190e911 100644
+--- a/module/zfs/vdev_raidz.c
++++ b/module/zfs/vdev_raidz.c
+@@ -22,11 +22,15 @@
+ /*
+  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Copyright (c) 2013 by Delphix. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ #include <sys/zfs_context.h>
+ #include <sys/spa.h>
+ #include <sys/vdev_impl.h>
++#include <sys/vdev_disk.h>
++#include <sys/vdev_file.h>
++#include <sys/vdev_raidz.h>
+ #include <sys/zio.h>
+ #include <sys/zio_checksum.h>
+ #include <sys/fs/zfs.h>
+@@ -154,6 +158,8 @@ typedef struct raidz_map {
+ 	VDEV_RAIDZ_64MUL_2((x), mask); \
+ }
+ 
++#define	VDEV_LABEL_OFFSET(x)	(x + VDEV_LABEL_START_SIZE)
++
+ /*
+  * Force reconstruction to use the general purpose method.
+  */
+@@ -435,14 +441,14 @@ static const zio_vsd_ops_t vdev_raidz_vsd_ops = {
+  * the number of children in the target vdev.
+  */
+ static raidz_map_t *
+-vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
+-    uint64_t nparity)
++vdev_raidz_map_alloc(caddr_t data, uint64_t size, uint64_t offset,
++    uint64_t unit_shift, uint64_t dcols, uint64_t nparity)
+ {
+ 	raidz_map_t *rm;
+ 	/* The starting RAIDZ (parent) vdev sector of the block. */
+-	uint64_t b = zio->io_offset >> unit_shift;
++	uint64_t b = offset >> unit_shift;
+ 	/* The zio's size in units of the vdev's minimum sector size. */
+-	uint64_t s = zio->io_size >> unit_shift;
++	uint64_t s = size >> unit_shift;
+ 	/* The first column for this stripe. */
+ 	uint64_t f = b % dcols;
+ 	/* The starting byte offset on each child vdev. */
+@@ -533,7 +539,7 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
+ 	for (c = 0; c < rm->rm_firstdatacol; c++)
+ 		rm->rm_col[c].rc_data = zio_buf_alloc(rm->rm_col[c].rc_size);
+ 
+-	rm->rm_col[c].rc_data = zio->io_data;
++	rm->rm_col[c].rc_data = data;
+ 
+ 	for (c = c + 1; c < acols; c++)
+ 		rm->rm_col[c].rc_data = (char *)rm->rm_col[c - 1].rc_data +
+@@ -562,7 +568,7 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
+ 	ASSERT(rm->rm_cols >= 2);
+ 	ASSERT(rm->rm_col[0].rc_size == rm->rm_col[1].rc_size);
+ 
+-	if (rm->rm_firstdatacol == 1 && (zio->io_offset & (1ULL << 20))) {
++	if (rm->rm_firstdatacol == 1 && (offset & (1ULL << 20))) {
+ 		devidx = rm->rm_col[0].rc_devidx;
+ 		o = rm->rm_col[0].rc_offset;
+ 		rm->rm_col[0].rc_devidx = rm->rm_col[1].rc_devidx;
+@@ -574,8 +580,6 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
+ 			rm->rm_skipstart = 1;
+ 	}
+ 
+-	zio->io_vsd = rm;
+-	zio->io_vsd_ops = &vdev_raidz_vsd_ops;
+ 	return (rm);
+ }
+ 
+@@ -985,12 +989,9 @@ vdev_raidz_reconstruct_pq(raidz_map_t *rm, int *tgts, int ntgts)
+  *           ~~                               ~~
+  *           __                               __
+  *           |  1   1   1   1   1   1   1   1  |
+- *           | 128  64  32  16  8   4   2   1  |
+  *           |  19 205 116  29  64  16  4   1  |
+  *           |  1   0   0   0   0   0   0   0  |
+- *           |  0   1   0   0   0   0   0   0  |
+- *  (V|I)' = |  0   0   1   0   0   0   0   0  |
+- *           |  0   0   0   1   0   0   0   0  |
++ *  (V|I)' = |  0   0   0   1   0   0   0   0  |
+  *           |  0   0   0   0   1   0   0   0  |
+  *           |  0   0   0   0   0   1   0   0  |
+  *           |  0   0   0   0   0   0   1   0  |
+@@ -1522,6 +1523,152 @@ vdev_raidz_close(vdev_t *vd)
+ 		vdev_close(vd->vdev_child[c]);
+ }
+ 
++/*
++ * Handle a read or write I/O to a RAID-Z dump device.
++ *
++ * The dump device is in a unique situation compared to other ZFS datasets:
++ * writing to this device should be as simple and fast as possible.  In
++ * addition, durability matters much less since the dump will be extracted
++ * once the machine reboots.  For that reason, this function eschews parity for
++ * performance and simplicity.  The dump device uses the checksum setting
++ * ZIO_CHECKSUM_NOPARITY to indicate that parity is not maintained for this
++ * dataset.
++ *
++ * Blocks of size 128 KB have been preallocated for this volume.  I/Os less than
++ * 128 KB will not fill an entire block; in addition, they may not be properly
++ * aligned.  In that case, this function uses the preallocated 128 KB block and
++ * omits reading or writing any "empty" portions of that block, as opposed to
++ * allocating a fresh appropriately-sized block.
++ *
++ * Looking at an example of a 32 KB I/O to a RAID-Z vdev with 5 child vdevs:
++ *
++ *     vdev_raidz_io_start(data, size: 32 KB, offset: 64 KB)
++ *
++ * If this were a standard RAID-Z dataset, a block of at least 40 KB would be
++ * allocated which spans all five child vdevs.  8 KB of data would be written to
++ * each of four vdevs, with the fifth containing the parity bits.
++ *
++ *       parity    data     data     data     data
++ *     |   PP   |   XX   |   XX   |   XX   |   XX   |
++ *         ^        ^        ^        ^        ^
++ *         |        |        |        |        |
++ *   8 KB parity    ------8 KB data blocks------
++ *
++ * However, when writing to the dump device, the behavior is different:
++ *
++ *     vdev_raidz_physio(data, size: 32 KB, offset: 64 KB)
++ *
++ * Unlike the normal RAID-Z case in which the block is allocated based on the
++ * I/O size, reads and writes here always use a 128 KB logical I/O size.  If the
++ * I/O size is less than 128 KB, only the actual portions of data are written.
++ * In this example the data is written to the third data vdev since that vdev
++ * contains the offset [64 KB, 96 KB).
++ *
++ *       parity    data     data     data     data
++ *     |        |        |        |   XX   |        |
++ *                                    ^
++ *                                    |
++ *                             32 KB data block
++ *
++ * As a result, an individual I/O may not span all child vdevs; moreover, a
++ * small I/O may only operate on a single child vdev.
++ *
++ * Note that since there are no parity bits calculated or written, this format
++ * remains the same no matter how many parity bits are used in a normal RAID-Z
++ * stripe.  On a RAID-Z3 configuration with seven child vdevs, the example above
++ * would look like:
++ *
++ *       parity   parity   parity    data     data     data     data
++ *     |        |        |        |        |        |   XX   |        |
++ *                                                      ^
++ *                                                      |
++ *                                               32 KB data block
++ */
++int
++vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
++    uint64_t offset, uint64_t origoffset, boolean_t doread, boolean_t isdump)
++{
++	vdev_t *tvd = vd->vdev_top;
++	vdev_t *cvd;
++	raidz_map_t *rm;
++	raidz_col_t *rc;
++	int c, err = 0;
++
++	uint64_t start, end, colstart, colend;
++	uint64_t coloffset, colsize, colskip;
++
++	int flags = doread ? B_READ : B_WRITE;
++
++#ifdef	_KERNEL
++
++	/*
++	 * Don't write past the end of the block
++	 */
++	VERIFY3U(offset + size, <=, origoffset + SPA_MAXBLOCKSIZE);
++
++	start = offset;
++	end = start + size;
++
++	/*
++	 * Allocate a RAID-Z map for this block.  Note that this block starts
++	 * from the "original" offset, this is, the offset of the extent which
++	 * contains the requisite offset of the data being read or written.
++	 *
++	 * Even if this I/O operation doesn't span the full block size, let's
++	 * treat the on-disk format as if the only blocks are the complete 128
++	 * KB size.
++	 */
++	rm = vdev_raidz_map_alloc(data - (offset - origoffset),
++	    SPA_MAXBLOCKSIZE, origoffset, tvd->vdev_ashift, vd->vdev_children,
++	    vd->vdev_nparity);
++
++	coloffset = origoffset;
++
++	for (c = rm->rm_firstdatacol; c < rm->rm_cols;
++	    c++, coloffset += rc->rc_size) {
++		rc = &rm->rm_col[c];
++		cvd = vd->vdev_child[rc->rc_devidx];
++
++		/*
++		 * Find the start and end of this column in the RAID-Z map,
++		 * keeping in mind that the stated size and offset of the
++		 * operation may not fill the entire column for this vdev.
++		 *
++		 * If any portion of the data spans this column, issue the
++		 * appropriate operation to the vdev.
++		 */
++		if (coloffset + rc->rc_size <= start)
++			continue;
++		if (coloffset >= end)
++			continue;
++
++		colstart = MAX(coloffset, start);
++		colend = MIN(end, coloffset + rc->rc_size);
++		colsize = colend - colstart;
++		colskip = colstart - coloffset;
++
++		VERIFY3U(colsize, <=, rc->rc_size);
++		VERIFY3U(colskip, <=, rc->rc_size);
++
++		/*
++		 * Note that the child vdev will have a vdev label at the start
++		 * of its range of offsets, hence the need for
++		 * VDEV_LABEL_OFFSET().  See zio_vdev_child_io() for another
++		 * example of why this calculation is needed.
++		 */
++		if ((err = vdev_disk_physio(cvd,
++		    ((char *)rc->rc_data) + colskip, colsize,
++		    VDEV_LABEL_OFFSET(rc->rc_offset) + colskip,
++		    flags, isdump)) != 0)
++			break;
++	}
++
++	vdev_raidz_map_free(rm);
++#endif	/* KERNEL */
++
++	return (err);
++}
++
+ static uint64_t
+ vdev_raidz_asize(vdev_t *vd, uint64_t psize)
+ {
+@@ -1574,9 +1721,13 @@ vdev_raidz_io_start(zio_t *zio)
+ 	raidz_col_t *rc;
+ 	int c, i;
+ 
+-	rm = vdev_raidz_map_alloc(zio, tvd->vdev_ashift, vd->vdev_children,
++	rm = vdev_raidz_map_alloc(zio->io_data, zio->io_size, zio->io_offset,
++	    tvd->vdev_ashift, vd->vdev_children,
+ 	    vd->vdev_nparity);
+ 
++	zio->io_vsd = rm;
++	zio->io_vsd_ops = &vdev_raidz_vsd_ops;
++
+ 	ASSERT3U(rm->rm_asize, ==, vdev_psize_to_asize(vd, zio->io_size));
+ 
+ 	if (zio->io_type == ZIO_TYPE_WRITE) {
+@@ -1707,6 +1858,13 @@ raidz_parity_verify(zio_t *zio, raidz_map_t *rm)
+ 	int c, ret = 0;
+ 	raidz_col_t *rc;
+ 
++	blkptr_t *bp = zio->io_bp;
++	enum zio_checksum checksum = (bp == NULL ? zio->io_prop.zp_checksum :
++	    (BP_IS_GANG(bp) ? ZIO_CHECKSUM_GANG_HEADER : BP_GET_CHECKSUM(bp)));
++
++	if (checksum == ZIO_CHECKSUM_NOPARITY)
++		return (ret);
++
+ 	for (c = 0; c < rm->rm_firstdatacol; c++) {
+ 		rc = &rm->rm_col[c];
+ 		if (!rc->rc_tried || rc->rc_error != 0)
+diff --git a/module/zfs/zio_checksum.c b/module/zfs/zio_checksum.c
+index bc73317..d1c60c3 100644
+--- a/module/zfs/zio_checksum.c
++++ b/module/zfs/zio_checksum.c
+@@ -21,6 +21,7 @@
+ /*
+  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Copyright (c) 2013 by Delphix. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ #include <sys/zfs_context.h>
+@@ -78,6 +79,7 @@ zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
+ 	{{fletcher_4_native,	fletcher_4_byteswap},	1, 0, 0, "fletcher4"},
+ 	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 0, 1, "sha256"},
+ 	{{fletcher_4_native,	fletcher_4_byteswap},	0, 1, 0, "zilog2"},
++	{{zio_checksum_off,	zio_checksum_off},	0, 0, 0, "noparity"},
+ };
+ 
+ enum zio_checksum
+diff --git a/module/zfs/zvol.c b/module/zfs/zvol.c
+index 5fad8cf..d53b5b2 100644
+--- a/module/zfs/zvol.c
++++ b/module/zfs/zvol.c
+@@ -25,6 +25,7 @@
+  *
+  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+  * Copyright (c) 2013 by Delphix. All rights reserved.
++ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+  */
+ 
+ /*
+@@ -54,6 +55,7 @@
+ #include <sys/stat.h>
+ #include <sys/zap.h>
+ #include <sys/spa.h>
++#include <sys/spa_impl.h>
+ #include <sys/zio.h>
+ #include <sys/dmu_traverse.h>
+ #include <sys/dnode.h>
+@@ -77,10 +79,14 @@
+ #include <sys/zfs_rlock.h>
+ #include <sys/vdev_disk.h>
+ #include <sys/vdev_impl.h>
++#include <sys/vdev_raidz.h>
+ #include <sys/zvol.h>
+ #include <sys/dumphdr.h>
+ #include <sys/zil_impl.h>
+ #include <sys/dbuf.h>
++#include <sys/dmu_tx.h>
++#include <sys/zfeature.h>
++#include <sys/zio_checksum.h>
+ 
+ #include "zfs_namecheck.h"
+ 
+@@ -1101,27 +1107,28 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t resid,
+ }
+ 
+ static int
+-zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
+-    boolean_t doread, boolean_t isdump)
++zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t origoffset,
++    uint64_t size, boolean_t doread, boolean_t isdump)
+ {
+ 	vdev_disk_t *dvd;
+ 	int c;
+ 	int numerrors = 0;
+ 
+-	for (c = 0; c < vd->vdev_children; c++) {
+-		ASSERT(vd->vdev_ops == &vdev_mirror_ops ||
+-		    vd->vdev_ops == &vdev_replacing_ops ||
+-		    vd->vdev_ops == &vdev_spare_ops);
+-		int err = zvol_dumpio_vdev(vd->vdev_child[c],
+-		    addr, offset, size, doread, isdump);
+-		if (err != 0) {
+-			numerrors++;
+-		} else if (doread) {
+-			break;
++	if (vd->vdev_ops == &vdev_mirror_ops ||
++	    vd->vdev_ops == &vdev_replacing_ops ||
++	    vd->vdev_ops == &vdev_spare_ops) {
++		for (c = 0; c < vd->vdev_children; c++) {
++			int err = zvol_dumpio_vdev(vd->vdev_child[c],
++			    addr, offset, origoffset, size, doread, isdump);
++			if (err != 0) {
++				numerrors++;
++			} else if (doread) {
++				break;
++			}
+ 		}
+ 	}
+ 
+-	if (!vd->vdev_ops->vdev_op_leaf)
++	if (!vd->vdev_ops->vdev_op_leaf && vd->vdev_ops != &vdev_raidz_ops)
+ 		return (numerrors < vd->vdev_children ? 0 : EIO);
+ 
+ 	if (doread && !vdev_readable(vd))
+@@ -1129,19 +1136,26 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
+ 	else if (!doread && !vdev_writeable(vd))
+ 		return (SET_ERROR(EIO));
+ 
+-	dvd = vd->vdev_tsd;
+-	ASSERT3P(dvd, !=, NULL);
++	if (vd->vdev_ops == &vdev_raidz_ops) {
++		return (vdev_raidz_physio(vd,
++		    addr, size, offset, origoffset, doread, isdump));
++	}
++
+ 	offset += VDEV_LABEL_START_SIZE;
+ 
+ 	if (ddi_in_panic() || isdump) {
+ 		ASSERT(!doread);
+ 		if (doread)
+ 			return (SET_ERROR(EIO));
++		dvd = vd->vdev_tsd;
++		ASSERT3P(dvd, !=, NULL);
+ 		return (ldi_dump(dvd->vd_lh, addr, lbtodb(offset),
+ 		    lbtodb(size)));
+ 	} else {
+-		return (vdev_disk_physio(dvd->vd_lh, addr, size, offset,
+-		    doread ? B_READ : B_WRITE));
++		dvd = vd->vdev_tsd;
++		ASSERT3P(dvd, !=, NULL);
++		return (vdev_disk_ldi_physio(dvd->vd_lh, addr, size,
++		    offset, doread ? B_READ : B_WRITE));
+ 	}
+ }
+ 
+@@ -1176,7 +1190,8 @@ zvol_dumpio(zvol_state_t *zv, void *addr, uint64_t offset, uint64_t size,
+ 
+ 	vd = vdev_lookup_top(spa, DVA_GET_VDEV(&ze->ze_dva));
+ 	offset += DVA_GET_OFFSET(&ze->ze_dva);
+-	error = zvol_dumpio_vdev(vd, addr, offset, size, doread, isdump);
++	error = zvol_dumpio_vdev(vd, addr, offset, DVA_GET_OFFSET(&ze->ze_dva),
++	    size, doread, isdump);
+ 
+ 	if (!ddi_in_panic())
+ 		spa_config_exit(spa, SCL_STATE, FTAG);
+@@ -1196,7 +1211,7 @@ zvol_strategy(buf_t *bp)
+ 	rl_t *rl;
+ 	int error = 0;
+ 	boolean_t doread = bp->b_flags & B_READ;
+-	boolean_t is_dump;
++	boolean_t is_dumpified;
+ 	boolean_t sync;
+ 
+ 	if (getminor(bp->b_edev) == 0) {
+@@ -1239,11 +1254,11 @@ zvol_strategy(buf_t *bp)
+ 		return (0);
+ 	}
+ 
+-	is_dump = zv->zv_flags & ZVOL_DUMPIFIED;
++	is_dumpified = zv->zv_flags & ZVOL_DUMPIFIED;
+ 	sync = ((!(bp->b_flags & B_ASYNC) &&
+ 	    !(zv->zv_flags & ZVOL_WCE)) ||
+ 	    (zv->zv_objset->os_sync == ZFS_SYNC_ALWAYS)) &&
+-	    !doread && !is_dump;
++	    !doread && !is_dumpified;
+ 
+ 	/*
+ 	 * There must be no buffer changes when doing a dmu_sync() because
+@@ -1254,7 +1269,7 @@ zvol_strategy(buf_t *bp)
+ 
+ 	while (resid != 0 && off < volsize) {
+ 		size_t size = MIN(resid, zvol_maxphys);
+-		if (is_dump) {
++		if (is_dumpified) {
+ 			size = MIN(size, P2END(off, zv->zv_volblocksize) - off);
+ 			error = zvol_dumpio(zv, addr, off, size,
+ 			    doread, B_FALSE);
+@@ -1813,21 +1828,67 @@ zvol_fini(void)
+ 	ddi_soft_state_fini(&zfsdev_state);
+ }
+ 
++/*ARGSUSED*/
++static int
++zfs_mvdev_dump_feature_check(void *arg, dmu_tx_t *tx)
++{
++	spa_t *spa = dmu_tx_pool(tx)->dp_spa;
++
++	if (spa_feature_is_active(spa,
++	    &spa_feature_table[SPA_FEATURE_MULTI_VDEV_CRASH_DUMP]))
++		return (1);
++	return (0);
++}
++
++/*ARGSUSED*/
++static void
++zfs_mvdev_dump_activate_feature_sync(void *arg, dmu_tx_t *tx)
++{
++	spa_t *spa = dmu_tx_pool(tx)->dp_spa;
++
++	spa_feature_incr(spa,
++	    &spa_feature_table[SPA_FEATURE_MULTI_VDEV_CRASH_DUMP], tx);
++}
++
+ static int
+ zvol_dump_init(zvol_state_t *zv, boolean_t resize)
+ {
+ 	dmu_tx_t *tx;
+-	int error = 0;
++	int error;
+ 	objset_t *os = zv->zv_objset;
++	spa_t *spa = dmu_objset_spa(os);
++	vdev_t *vd = spa->spa_root_vdev;
+ 	nvlist_t *nv = NULL;
+-	uint64_t version = spa_version(dmu_objset_spa(zv->zv_objset));
++	uint64_t version = spa_version(spa);
++	enum zio_checksum checksum;
+ 
+ 	ASSERT(MUTEX_HELD(&zfsdev_state_lock));
++	ASSERT(vd->vdev_ops == &vdev_root_ops);
++
+ 	error = dmu_free_long_range(zv->zv_objset, ZVOL_OBJ, 0,
+ 	    DMU_OBJECT_END);
+ 	/* wait for dmu_free_long_range to actually free the blocks */
+ 	txg_wait_synced(dmu_objset_pool(zv->zv_objset), 0);
+ 
++	/*
++	 * If the pool on which the dump device is being initialized has more
++	 * than one child vdev, check that the MULTI_VDEV_CRASH_DUMP feature is
++	 * enabled.  If so, bump that feature's counter to indicate that the
++	 * feature is active. We also check the vdev type to handle the
++	 * following case:
++	 *   # zpool create test raidz disk1 disk2 disk3
++	 *   Now have spa_root_vdev->vdev_children == 1 (the raidz vdev),
++	 *   the raidz vdev itself has 3 children.
++	 */
++	if (vd->vdev_children > 1 || vd->vdev_ops == &vdev_raidz_ops) {
++		if (!spa_feature_is_enabled(spa,
++		    &spa_feature_table[SPA_FEATURE_MULTI_VDEV_CRASH_DUMP]))
++			return (SET_ERROR(ENOTSUP));
++		(void) dsl_sync_task(spa_name(spa),
++		    zfs_mvdev_dump_feature_check,
++		    zfs_mvdev_dump_activate_feature_sync, NULL, 2);
++	}
++
+ 	tx = dmu_tx_create(os);
+ 	dmu_tx_hold_zap(tx, ZVOL_ZAP_OBJ, TRUE, NULL);
+ 	dmu_tx_hold_bonus(tx, ZVOL_OBJ);
+@@ -1838,6 +1899,14 @@ zvol_dump_init(zvol_state_t *zv, boolean_t resize)
+ 	}
+ 
+ 	/*
++	 * If MULTI_VDEV_CRASH_DUMP is active, use the NOPARITY checksum
++	 * function.  Otherwise, use the old default -- OFF.
++	 */
++	checksum = spa_feature_is_active(spa,
++	    &spa_feature_table[SPA_FEATURE_MULTI_VDEV_CRASH_DUMP]) ?
++	    ZIO_CHECKSUM_NOPARITY : ZIO_CHECKSUM_OFF;
++
++	/*
+ 	 * If we are resizing the dump device then we only need to
+ 	 * update the refreservation to match the newly updated
+ 	 * zvolsize. Otherwise, we save off the original state of the
+@@ -1900,7 +1969,7 @@ zvol_dump_init(zvol_state_t *zv, boolean_t resize)
+ 		    ZIO_COMPRESS_OFF) == 0);
+ 		VERIFY(nvlist_add_uint64(nv,
+ 		    zfs_prop_to_name(ZFS_PROP_CHECKSUM),
+-		    ZIO_CHECKSUM_OFF) == 0);
++		    checksum) == 0);
+ 		if (version >= SPA_VERSION_DEDUP) {
+ 			VERIFY(nvlist_add_uint64(nv,
+ 			    zfs_prop_to_name(ZFS_PROP_DEDUP),
