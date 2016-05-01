@@ -245,6 +245,7 @@ zpool_feature_init(void)
 
 	{
 	static const spa_feature_t lz4hc_compress_deps[] = {
+		SPA_FEATURE_EXTENSIBLE_DATASET,
 		SPA_FEATURE_LZ4_COMPRESS,
 		SPA_FEATURE_NONE
 	};
