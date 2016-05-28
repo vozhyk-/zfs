@@ -223,6 +223,12 @@ typedef struct dsl_dataset {
 	 */
 	uint8_t ds_feature_activation_needed[SPA_FEATURES];
 
+	/*
+	 * Set if we need to deactivate the feature on this dataset this txg
+	 * (used only in syncing context).
+	 */
+	uint8_t ds_feature_deactivation_needed[SPA_FEATURES];
+
 	/* Protected by ds_lock; keep at end of struct for better locality */
 	char ds_snapname[ZFS_MAX_DATASET_NAME_LEN];
 } dsl_dataset_t;
