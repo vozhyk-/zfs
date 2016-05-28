@@ -1622,6 +1622,11 @@ dsl_dataset_sync(dsl_dataset_t *ds, zio_t *zio, dmu_tx_t *tx)
 				continue;
 			dsl_dataset_activate_feature(ds->ds_object, f, tx);
 			ds->ds_feature_inuse[f] = B_TRUE;
+		} else if (ds->ds_feature_deactivation_needed[f]) {
+			if (!ds->ds_feature_inuse[f])
+				continue;
+			dsl_dataset_deactivate_feature(ds->ds_object, f, tx);
+			ds->ds_feature_inuse[f] = B_FALSE;
 		}
 	}
 }
